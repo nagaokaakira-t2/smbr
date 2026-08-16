@@ -86,6 +86,7 @@
   }
   button:hover{border-color:var(--cyan); background:#241f36; transform:translateY(-1px);}
   button:active{transform:translateY(0);}
+  button:disabled{opacity:0.4; cursor:not-allowed; transform:none;}
   button.primary{
     background:linear-gradient(90deg, rgba(0,229,255,0.18), rgba(255,47,146,0.18));
     border-color:var(--cyan);
@@ -119,11 +120,12 @@
   .cs-card{
     background:var(--panel2); border:2px solid var(--border); border-radius:8px;
     padding:10px 8px; text-align:center; cursor:pointer; transition:.12s;
-    display:flex; flex-direction:column; align-items:center; gap:6px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
   }
   .cs-card:hover{border-color:var(--cyan); transform:translateY(-2px);}
-  .cs-card .swatch{width:38px; height:38px; border-radius:50%; box-shadow:0 0 14px currentColor;}
+  .cs-card .swatch{width:36px; height:36px; border-radius:50%; box-shadow:0 0 14px currentColor;}
   .cs-card .cname{font-weight:700; font-size:12.5px;}
+  .cs-card .ctrait{font-size:9px; color:var(--yellow); font-weight:700; letter-spacing:0.5px;}
   .cs-card .bars{width:100%; display:flex; flex-direction:column; gap:2px; margin-top:2px;}
   .bar-row{display:flex; align-items:center; gap:4px; font-size:9px; color:var(--muted);}
   .bar-row span:first-child{width:20px; text-align:left;}
@@ -159,6 +161,33 @@
   #result-name{font-family:'Bebas Neue',sans-serif; font-size:clamp(40px,8vw,72px); letter-spacing:3px; margin:0;}
   #result-sub{color:var(--muted); letter-spacing:2px; margin-top:6px; font-size:13px;}
   .result-btns{display:flex; gap:12px; margin-top:36px;}
+
+  /* ---- ML mode screen ---- */
+  #screen-ml{overflow-y:auto;}
+  .ml-body{display:flex; gap:16px; flex:1; min-height:0;}
+  .ml-left{flex:1; display:flex; flex-direction:column; gap:12px; overflow-y:auto; min-width:0;}
+  .ml-right{width:44%; flex-shrink:0;}
+  #ml-canvas{width:100%; height:auto; aspect-ratio:960/650; background:#0c0a16; border:1px solid var(--border); border-radius:8px; display:block;}
+  .ml-block{background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:10px 12px;}
+  .ml-block h4{margin:0 0 8px 0; font-size:11px; letter-spacing:1.5px; color:var(--muted);}
+  .ml-charrow{display:flex; flex-wrap:wrap; gap:7px;}
+  .ml-chip{width:38px; height:38px; border-radius:50%; border:2px solid var(--border); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:9px; text-align:center; color:#0a0912; font-weight:900;}
+  .ml-chip.active{border-color:var(--cyan); box-shadow:0 0 0 2px rgba(0,229,255,0.4);}
+  .ml-row{display:flex; align-items:center; justify-content:space-between; font-size:12px; margin-top:8px;}
+  .ml-speedbtns{display:flex; gap:4px;}
+  .ml-speedbtns button.active{border-color:var(--yellow); color:var(--yellow); background:#2a2410;}
+  .ml-stats{font-family:'Space Mono',monospace; font-size:11.5px; line-height:1.8; color:var(--text); white-space:pre-line;}
+  .ml-btns{display:flex; flex-direction:column; gap:8px;}
+  .ml-desc{font-size:11.5px; color:var(--muted); line-height:1.6;}
+
+  /* ---- confirm modal ---- */
+  .modal-overlay{position:absolute; inset:0; background:rgba(5,4,10,0.78); display:none; align-items:center; justify-content:center; z-index:100;}
+  .modal-overlay.active{display:flex;}
+  .modal-box{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:24px 26px; width:min(84%,320px); text-align:center;}
+  .modal-title{font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; margin-bottom:10px;}
+  .modal-msg{font-size:13px; color:var(--muted); line-height:1.7; margin-bottom:20px;}
+  .modal-btns{display:flex; gap:10px; justify-content:center;}
 </style>
 </head>
 <body>
@@ -174,6 +203,7 @@
       </div>
       <div class="menu-btns">
         <button class="primary" id="btn-to-select">対戦をはじめる</button>
+        <button id="btn-to-ml">AI学習モード</button>
         <button id="btn-to-keyconfig">キー設定</button>
       </div>
       <div class="hint">同じキーボードで1P / 2P が対戦する形式です（通信・オンライン要素はありません）</div>
@@ -248,6 +278,55 @@
       </div>
     </div>
 
+    <!-- AI TRAINING MODE -->
+    <div id="screen-ml" class="screen">
+      <div class="screen-head">
+        <div class="screen-title-text">AI学習モード</div>
+        <button class="small" id="btn-ml-back">戻る</button>
+      </div>
+      <div class="ml-body">
+        <div class="ml-left">
+          <div class="ml-block">
+            <h4>学習させるキャラクター</h4>
+            <div class="ml-charrow" id="ml-charrow"></div>
+          </div>
+          <div class="ml-block">
+            <h4>学習設定</h4>
+            <div class="ml-row"><span>再生速度</span><div class="ml-speedbtns" id="ml-speedbtns"></div></div>
+            <div class="ml-row"><label><input type="checkbox" id="ml-show" checked> 対戦の様子を表示する</label></div>
+          </div>
+          <div class="ml-block">
+            <h4>学習状況</h4>
+            <div class="ml-stats" id="ml-stats">キャラクターを選んでください</div>
+          </div>
+          <div class="ml-block">
+            <p class="ml-desc">同じキャラクター同士を戦わせ続け、勝敗の結果から「どんな状況で何をすると有利か」を少しずつ学習します（強化学習）。学習データはこのページを開いている間だけ保持され、リロードすると失われます。</p>
+          </div>
+          <div class="ml-btns">
+            <button class="primary" id="btn-ml-start">学習開始</button>
+            <button id="btn-ml-stop" disabled>学習停止</button>
+            <button id="btn-ml-fight">このAIと対戦する</button>
+            <button id="btn-ml-reset" style="border-color:#ff2f92;color:#ff2f92;">学習データをリセット</button>
+          </div>
+        </div>
+        <div class="ml-right">
+          <canvas id="ml-canvas" width="480" height="325"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CONFIRM MODAL -->
+  <div id="modal-confirm" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" id="modal-title">確認</div>
+      <div class="modal-msg" id="modal-msg"></div>
+      <div class="modal-btns">
+        <button id="modal-cancel">キャンセル</button>
+        <button id="modal-ok" style="border-color:#ff2f92;color:#ff2f92;">実行する</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -257,17 +336,171 @@
 
 /* ===================== DATA ===================== */
 
+/* 各キャラの技構成（jab/upAtk/downAtk/strong/grab/spNeutral/spUp/spDown/spSide/dashHit）は
+   すべて個別にチューニングされています。startup=発生, active=持続, recover=硬直,
+   dmg=威力, kbBase/kbGrowth=ふっとばし, kx/ky=ふっとぶ方向, w/h/ox/oy=判定サイズと位置 */
+
 const CHARACTERS = [
-  {id:'blaze',  name:'ブレイズ',   color:'#ff5a36', speed:6, power:8, weight:5, jump:6},
-  {id:'aqua',   name:'アクア',     color:'#2fb8ff', speed:7, power:5, weight:5, jump:7},
-  {id:'volt',   name:'ボルト',     color:'#ffe14d', speed:9, power:4, weight:3, jump:8},
-  {id:'rock',   name:'ロック',     color:'#a97b4f', speed:3, power:9, weight:9, jump:4},
-  {id:'shadow', name:'シャドウ',   color:'#8a5cff', speed:7, power:6, weight:5, jump:6},
-  {id:'mist',   name:'ミスト',     color:'#7fe0c9', speed:6, power:5, weight:4, jump:7},
-  {id:'ember',  name:'エンバー',   color:'#ff3f6b', speed:5, power:7, weight:6, jump:5},
-  {id:'steel',  name:'スチール',   color:'#c3ccd6', speed:4, power:7, weight:10,jump:3},
-  {id:'gale',   name:'ゲイル',     color:'#5dffa0', speed:10,power:3, weight:3, jump:9},
-  {id:'crystal',name:'クリスタル', color:'#ff8ff0', speed:5, power:6, weight:5, jump:6},
+  {
+    id:'blaze', name:'ブレイズ', color:'#ff5a36', speed:6, power:8, weight:5, jump:6, extraJumps:0,
+    trait:{id:'rage', name:'レイジ', desc:'自分のダメージ%が高いほど、攻撃のふっとばし力が上昇する'},
+    attacks:{
+      jab:      {startup:4, active:5, recover:9,  dmg:3,  kbBase:3, kbGrowth:0.08, kx:1,    ky:-0.10, w:42,h:24,ox:28,oy:14, type:'atk'},
+      upAtk:    {startup:6, active:6, recover:13, dmg:4,  kbBase:4, kbGrowth:0.10, kx:0.2,  ky:-1,    w:32,h:38,ox:6, oy:-28,type:'atk'},
+      downAtk:  {startup:5, active:6, recover:13, dmg:4,  kbBase:4, kbGrowth:0.10, kx:0.6,  ky:0.40,  w:42,h:20,ox:24,oy:36, type:'atk'},
+      strong:   {startup:14,active:6, recover:20, dmg:10, kbBase:9, kbGrowth:0.24, kx:1,    ky:-0.30, w:58,h:30,ox:36,oy:10, type:'atk'},
+      grab:     {startup:8, active:6, recover:16, dmg:5,  kbBase:6, kbGrowth:0.14, kx:1,    ky:-0.40, w:34,h:34,ox:26,oy:8,  type:'grab'},
+      spNeutral:{startup:14,active:20,recover:20, dmg:6,  kbBase:5, kbGrowth:0.14, kx:1.2,  ky:-0.15, w:50,h:20,ox:50,oy:10, type:'atk'},
+      spUp:     {startup:7, active:9, recover:15, dmg:7,  kbBase:8, kbGrowth:0.18, kx:0.3,  ky:-1.10, w:40,h:54,ox:4, oy:-38,type:'atk'},
+      spDown:   {startup:9, active:10,recover:18, dmg:6,  kbBase:6, kbGrowth:0.15, kx:0.4,  ky:0.60,  w:60,h:22,ox:20,oy:36, type:'atk'},
+      spSide:   {startup:9, active:10,recover:17, dmg:7,  kbBase:7, kbGrowth:0.17, kx:1.1,  ky:-0.20, w:54,h:28,ox:38,oy:10, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:4,  kbBase:4, kbGrowth:0.10, kx:1,    ky:-0.20, w:40,h:30,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'aqua', name:'アクア', color:'#2fb8ff', speed:7, power:5, weight:5, jump:7, extraJumps:1,
+    trait:{id:'doubleJump', name:'二段ジャンプ', desc:'空中でもう一度ジャンプできる'},
+    attacks:{
+      jab:      {startup:4, active:4, recover:8,  dmg:2, kbBase:2, kbGrowth:0.08, kx:1,   ky:-0.10, w:40,h:22,ox:28,oy:14, type:'atk'},
+      upAtk:    {startup:5, active:6, recover:12, dmg:3, kbBase:3, kbGrowth:0.10, kx:0.2, ky:-1,    w:30,h:40,ox:6, oy:-30,type:'atk'},
+      downAtk:  {startup:5, active:5, recover:12, dmg:3, kbBase:3, kbGrowth:0.09, kx:0.5, ky:0.40,  w:40,h:18,ox:24,oy:36, type:'atk'},
+      strong:   {startup:13,active:6, recover:18, dmg:7, kbBase:6, kbGrowth:0.16, kx:1,   ky:-0.30, w:52,h:28,ox:34,oy:10, type:'atk'},
+      grab:     {startup:7, active:5, recover:14, dmg:4, kbBase:5, kbGrowth:0.12, kx:1,   ky:-0.40, w:32,h:32,ox:24,oy:8,  type:'grab'},
+      spNeutral:{startup:8, active:8, recover:14, dmg:4, kbBase:4, kbGrowth:0.12, kx:1,   ky:-0.15, w:44,h:20,ox:40,oy:10, type:'atk'},
+      spUp:     {startup:6, active:12,recover:14, dmg:5, kbBase:5, kbGrowth:0.13, kx:0.2, ky:-1.20, w:36,h:60,ox:4, oy:-42,type:'atk'},
+      spDown:   {startup:8, active:8, recover:14, dmg:5, kbBase:5, kbGrowth:0.13, kx:0.3, ky:0.50,  w:48,h:22,ox:16,oy:34, type:'atk'},
+      spSide:   {startup:7, active:12,recover:14, dmg:5, kbBase:5, kbGrowth:0.13, kx:1.3, ky:-0.15, w:62,h:24,ox:44,oy:12, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:3, kbBase:3, kbGrowth:0.08, kx:1,   ky:-0.20, w:40,h:28,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'volt', name:'ボルト', color:'#ffe14d', speed:9, power:4, weight:3, jump:8, extraJumps:0,
+    trait:{id:'quickCancel', name:'俊敏', desc:'すべての技の隙（硬直）が短く、テンポよく動ける'},
+    attacks:{
+      jab:      {startup:3, active:4, recover:6,  dmg:2, kbBase:2, kbGrowth:0.07, kx:1,   ky:-0.10, w:38,h:20,ox:26,oy:14, type:'atk'},
+      upAtk:    {startup:4, active:5, recover:9,  dmg:3, kbBase:3, kbGrowth:0.09, kx:0.2, ky:-1,    w:28,h:36,ox:6, oy:-26,type:'atk'},
+      downAtk:  {startup:4, active:5, recover:9,  dmg:3, kbBase:3, kbGrowth:0.08, kx:0.5, ky:0.35,  w:38,h:16,ox:22,oy:34, type:'atk'},
+      strong:   {startup:10,active:5, recover:14, dmg:6, kbBase:5, kbGrowth:0.15, kx:1,   ky:-0.25, w:48,h:26,ox:32,oy:10, type:'atk'},
+      grab:     {startup:6, active:4, recover:11, dmg:3, kbBase:4, kbGrowth:0.11, kx:1,   ky:-0.35, w:30,h:30,ox:22,oy:8,  type:'grab'},
+      spNeutral:{startup:6, active:6, recover:10, dmg:3, kbBase:3, kbGrowth:0.10, kx:0.9, ky:-0.15, w:36,h:18,ox:28,oy:10, type:'atk'},
+      spUp:     {startup:5, active:8, recover:10, dmg:4, kbBase:4, kbGrowth:0.11, kx:0.25,ky:-0.95, w:32,h:48,ox:2, oy:-32,type:'atk'},
+      spDown:   {startup:6, active:7, recover:11, dmg:4, kbBase:4, kbGrowth:0.11, kx:0.3, ky:0.50,  w:40,h:18,ox:14,oy:30, type:'atk'},
+      spSide:   {startup:5, active:9, recover:10, dmg:5, kbBase:5, kbGrowth:0.12, kx:1.4, ky:-0.15, w:56,h:22,ox:42,oy:10, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:3, kbBase:3, kbGrowth:0.08, kx:1,   ky:-0.20, w:38,h:26,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'rock', name:'ロック', color:'#a97b4f', speed:3, power:9, weight:9, jump:4, extraJumps:0,
+    trait:{id:'superArmor', name:'スーパーアーマー', desc:'一部の技を繰り出している間、弱い攻撃ではひるまない'},
+    attacks:{
+      jab:      {startup:8, active:6, recover:14, dmg:5,  kbBase:5,  kbGrowth:0.12, kx:1,   ky:-0.10, w:46,h:26,ox:30,oy:14, type:'atk', armored:true},
+      upAtk:    {startup:9, active:7, recover:16, dmg:6,  kbBase:6,  kbGrowth:0.13, kx:0.2, ky:-1,    w:36,h:42,ox:6, oy:-30,type:'atk'},
+      downAtk:  {startup:8, active:7, recover:16, dmg:6,  kbBase:6,  kbGrowth:0.12, kx:0.6, ky:0.40,  w:48,h:22,ox:28,oy:38, type:'atk'},
+      strong:   {startup:20,active:7, recover:26, dmg:13, kbBase:11, kbGrowth:0.26, kx:1,   ky:-0.35, w:62,h:34,ox:40,oy:10, type:'atk', armored:true},
+      grab:     {startup:10,active:7, recover:18, dmg:7,  kbBase:8,  kbGrowth:0.16, kx:1,   ky:-0.45, w:38,h:36,ox:28,oy:8,  type:'grab'},
+      spNeutral:{startup:16,active:9, recover:22, dmg:8,  kbBase:8,  kbGrowth:0.18, kx:1,   ky:-0.20, w:48,h:28,ox:36,oy:12, type:'atk'},
+      spUp:     {startup:10,active:11,recover:18, dmg:8,  kbBase:8,  kbGrowth:0.18, kx:0.3, ky:-1,    w:46,h:58,ox:2, oy:-40,type:'atk'},
+      spDown:   {startup:12,active:10,recover:20, dmg:9,  kbBase:9,  kbGrowth:0.20, kx:0.4, ky:0.70,  w:56,h:28,ox:18,oy:38, type:'atk'},
+      spSide:   {startup:12,active:10,recover:20, dmg:9,  kbBase:9,  kbGrowth:0.20, kx:1.1, ky:-0.20, w:58,h:32,ox:38,oy:12, type:'atk', armored:true},
+      dashHit:  {startup:0, active:999,recover:0, dmg:5,  kbBase:5,  kbGrowth:0.12, kx:1,   ky:-0.20, w:44,h:32,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'shadow', name:'シャドウ', color:'#8a5cff', speed:7, power:6, weight:5, jump:6, extraJumps:0,
+    trait:{id:'counterInvuln', name:'残影', desc:'攻撃を当てた瞬間、一瞬だけ無敵になる'},
+    attacks:{
+      jab:      {startup:4, active:5, recover:10, dmg:3, kbBase:3, kbGrowth:0.10, kx:1,   ky:-0.15, w:44,h:24,ox:30,oy:14, type:'atk'},
+      upAtk:    {startup:5, active:6, recover:13, dmg:4, kbBase:4, kbGrowth:0.12, kx:0.25,ky:-1,    w:32,h:40,ox:6, oy:-30,type:'atk'},
+      downAtk:  {startup:5, active:6, recover:13, dmg:4, kbBase:4, kbGrowth:0.11, kx:0.6, ky:0.40,  w:44,h:20,ox:26,oy:36, type:'atk'},
+      strong:   {startup:13,active:6, recover:19, dmg:8, kbBase:7, kbGrowth:0.19, kx:1,   ky:-0.30, w:54,h:28,ox:38,oy:10, type:'atk'},
+      grab:     {startup:7, active:6, recover:15, dmg:5, kbBase:6, kbGrowth:0.14, kx:1,   ky:-0.40, w:34,h:34,ox:28,oy:8,  type:'grab'},
+      spNeutral:{startup:10,active:8, recover:16, dmg:6, kbBase:6, kbGrowth:0.15, kx:1,   ky:-0.20, w:52,h:22,ox:46,oy:10, type:'atk'},
+      spUp:     {startup:7, active:9, recover:15, dmg:6, kbBase:7, kbGrowth:0.17, kx:0.3, ky:-1.05, w:40,h:52,ox:4, oy:-36,type:'atk'},
+      spDown:   {startup:9, active:8, recover:16, dmg:6, kbBase:6, kbGrowth:0.16, kx:0.3, ky:0.50,  w:48,h:24,ox:18,oy:34, type:'atk'},
+      spSide:   {startup:9, active:8, recover:15, dmg:7, kbBase:7, kbGrowth:0.17, kx:1.3, ky:-0.20, w:66,h:26,ox:52,oy:12, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:4, kbBase:4, kbGrowth:0.11, kx:1,   ky:-0.20, w:42,h:30,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'mist', name:'ミスト', color:'#7fe0c9', speed:6, power:5, weight:4, jump:7, extraJumps:0,
+    trait:{id:'shieldSaver', name:'省エネガード', desc:'ガード時のシールド消費が少ない'},
+    attacks:{
+      jab:      {startup:5, active:5, recover:10, dmg:2, kbBase:2, kbGrowth:0.07, kx:1,   ky:-0.10, w:48,h:20,ox:34,oy:14, type:'atk'},
+      upAtk:    {startup:6, active:6, recover:13, dmg:3, kbBase:3, kbGrowth:0.09, kx:0.2, ky:-0.95, w:34,h:38,ox:8, oy:-28,type:'atk'},
+      downAtk:  {startup:5, active:6, recover:13, dmg:3, kbBase:3, kbGrowth:0.09, kx:0.5, ky:0.35,  w:46,h:18,ox:28,oy:34, type:'atk'},
+      strong:   {startup:15,active:6, recover:20, dmg:7, kbBase:6, kbGrowth:0.16, kx:1,   ky:-0.28, w:58,h:26,ox:40,oy:10, type:'atk'},
+      grab:     {startup:8, active:6, recover:16, dmg:4, kbBase:5, kbGrowth:0.12, kx:1,   ky:-0.35, w:34,h:32,ox:28,oy:8,  type:'grab'},
+      spNeutral:{startup:9, active:9, recover:15, dmg:4, kbBase:4, kbGrowth:0.12, kx:1.2, ky:-0.15, w:70,h:14,ox:58,oy:10, type:'atk'},
+      spUp:     {startup:7, active:10,recover:15, dmg:5, kbBase:5, kbGrowth:0.13, kx:0.2, ky:-1.10, w:36,h:56,ox:4, oy:-38,type:'atk'},
+      spDown:   {startup:9, active:9, recover:15, dmg:5, kbBase:5, kbGrowth:0.13, kx:0.3, ky:0.50,  w:60,h:20,ox:22,oy:34, type:'atk'},
+      spSide:   {startup:8, active:10,recover:14, dmg:5, kbBase:5, kbGrowth:0.13, kx:1.25,ky:-0.15, w:64,h:20,ox:52,oy:12, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:3, kbBase:3, kbGrowth:0.09, kx:1,   ky:-0.20, w:42,h:26,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'ember', name:'エンバー', color:'#ff3f6b', speed:5, power:7, weight:6, jump:5, extraJumps:0,
+    trait:{id:'heavyHits', name:'重撃', desc:'攻撃のふっとばし成長率が高く、蓄積ダメージが多いほど大きく飛ばせる'},
+    attacks:{
+      jab:      {startup:6, active:5, recover:11, dmg:4,  kbBase:4,  kbGrowth:0.13, kx:1,   ky:-0.12, w:44,h:26,ox:30,oy:14, type:'atk'},
+      upAtk:    {startup:7, active:6, recover:14, dmg:5,  kbBase:5,  kbGrowth:0.14, kx:0.25,ky:-1,    w:34,h:40,ox:6, oy:-30,type:'atk'},
+      downAtk:  {startup:6, active:6, recover:14, dmg:5,  kbBase:5,  kbGrowth:0.13, kx:0.6, ky:0.40,  w:46,h:20,ox:26,oy:36, type:'atk'},
+      strong:   {startup:17,active:6, recover:22, dmg:11, kbBase:10, kbGrowth:0.26, kx:1,   ky:-0.32, w:58,h:30,ox:36,oy:10, type:'atk'},
+      grab:     {startup:9, active:6, recover:17, dmg:6,  kbBase:7,  kbGrowth:0.16, kx:1,   ky:-0.42, w:36,h:34,ox:28,oy:8,  type:'grab'},
+      spNeutral:{startup:14,active:10,recover:20, dmg:7,  kbBase:7,  kbGrowth:0.18, kx:1,   ky:-0.20, w:48,h:24,ox:38,oy:12, type:'atk'},
+      spUp:     {startup:8, active:9, recover:16, dmg:7,  kbBase:8,  kbGrowth:0.20, kx:0.3, ky:-1.10, w:42,h:54,ox:4, oy:-36,type:'atk'},
+      spDown:   {startup:10,active:9, recover:18, dmg:8,  kbBase:8,  kbGrowth:0.20, kx:0.4, ky:0.65,  w:52,h:26,ox:18,oy:36, type:'atk'},
+      spSide:   {startup:10,active:9, recover:18, dmg:8,  kbBase:8,  kbGrowth:0.20, kx:1.1, ky:-0.22, w:54,h:30,ox:38,oy:12, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:5,  kbBase:5,  kbGrowth:0.13, kx:1,   ky:-0.20, w:42,h:30,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'steel', name:'スチール', color:'#c3ccd6', speed:4, power:7, weight:10, jump:3, extraJumps:0,
+    trait:{id:'knockbackResist', name:'剛体', desc:'重い体でふっとばされにくい'},
+    attacks:{
+      jab:      {startup:9, active:6, recover:15, dmg:5,  kbBase:5,  kbGrowth:0.12, kx:1,   ky:-0.10, w:48,h:28,ox:32,oy:14, type:'atk'},
+      upAtk:    {startup:10,active:7, recover:17, dmg:6,  kbBase:6,  kbGrowth:0.13, kx:0.2, ky:-1,    w:38,h:44,ox:6, oy:-32,type:'atk'},
+      downAtk:  {startup:9, active:7, recover:17, dmg:6,  kbBase:6,  kbGrowth:0.12, kx:0.6, ky:0.40,  w:50,h:22,ox:30,oy:38, type:'atk'},
+      strong:   {startup:22,active:8, recover:28, dmg:14, kbBase:12, kbGrowth:0.27, kx:1,   ky:-0.35, w:66,h:36,ox:42,oy:10, type:'atk'},
+      grab:     {startup:11,active:8, recover:20, dmg:8,  kbBase:9,  kbGrowth:0.17, kx:1,   ky:-0.48, w:40,h:38,ox:30,oy:8,  type:'grab'},
+      spNeutral:{startup:17,active:9, recover:24, dmg:9,  kbBase:9,  kbGrowth:0.19, kx:1,   ky:-0.20, w:52,h:30,ox:38,oy:12, type:'atk'},
+      spUp:     {startup:11,active:11,recover:19, dmg:9,  kbBase:9,  kbGrowth:0.19, kx:0.3, ky:-1,    w:48,h:60,ox:2, oy:-42,type:'atk'},
+      spDown:   {startup:13,active:10,recover:21, dmg:10, kbBase:10, kbGrowth:0.21, kx:0.4, ky:0.70,  w:58,h:30,ox:20,oy:40, type:'atk'},
+      spSide:   {startup:13,active:10,recover:21, dmg:10, kbBase:10, kbGrowth:0.21, kx:1.05,ky:-0.22, w:60,h:34,ox:40,oy:12, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:6,  kbBase:6,  kbGrowth:0.13, kx:1,   ky:-0.20, w:46,h:34,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'gale', name:'ゲイル', color:'#5dffa0', speed:10, power:3, weight:3, jump:9, extraJumps:2,
+    trait:{id:'tripleJump', name:'三段ジャンプ', desc:'空中で二回まで追加ジャンプできる'},
+    attacks:{
+      jab:      {startup:2, active:3, recover:5, dmg:1, kbBase:1, kbGrowth:0.06, kx:1,   ky:-0.10, w:36,h:18,ox:24,oy:14, type:'atk'},
+      upAtk:    {startup:3, active:4, recover:7, dmg:2, kbBase:2, kbGrowth:0.07, kx:0.2, ky:-0.9,  w:26,h:34,ox:6, oy:-24,type:'atk'},
+      downAtk:  {startup:3, active:4, recover:7, dmg:2, kbBase:2, kbGrowth:0.07, kx:0.5, ky:0.30,  w:36,h:14,ox:20,oy:32, type:'atk'},
+      strong:   {startup:8, active:4, recover:12,dmg:5, kbBase:4, kbGrowth:0.14, kx:1,   ky:-0.22, w:44,h:22,ox:30,oy:10, type:'atk'},
+      grab:     {startup:5, active:4, recover:10,dmg:3, kbBase:3, kbGrowth:0.10, kx:1,   ky:-0.32, w:28,h:28,ox:20,oy:8,  type:'grab'},
+      spNeutral:{startup:5, active:6, recover:9, dmg:2, kbBase:2, kbGrowth:0.09, kx:0.9, ky:-0.15, w:34,h:16,ox:26,oy:10, type:'atk'},
+      spUp:     {startup:4, active:7, recover:9, dmg:3, kbBase:3, kbGrowth:0.10, kx:0.25,ky:-0.9,  w:30,h:44,ox:2, oy:-30,type:'atk'},
+      spDown:   {startup:5, active:6, recover:9, dmg:3, kbBase:3, kbGrowth:0.10, kx:0.3, ky:0.45,  w:38,h:16,ox:14,oy:28, type:'atk'},
+      spSide:   {startup:4, active:8, recover:9, dmg:4, kbBase:4, kbGrowth:0.11, kx:1.5, ky:-0.15, w:58,h:20,ox:46,oy:10, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0,dmg:2, kbBase:2, kbGrowth:0.07, kx:1,   ky:-0.20, w:36,h:22,ox:10,oy:10, type:'atk'},
+    }
+  },
+  {
+    id:'crystal', name:'クリスタル', color:'#ff8ff0', speed:5, power:6, weight:5, jump:6, extraJumps:0,
+    trait:{id:'absorb', name:'結晶装甲', desc:'結晶の体が衝撃を吸収し、受けるダメージが25%軽減される'},
+    attacks:{
+      jab:      {startup:5, active:5, recover:10, dmg:3, kbBase:3, kbGrowth:0.10, kx:1,   ky:-0.12, w:42,h:24,ox:28,oy:14, type:'atk'},
+      upAtk:    {startup:6, active:6, recover:13, dmg:4, kbBase:4, kbGrowth:0.11, kx:0.22,ky:-1,    w:32,h:38,ox:6, oy:-28,type:'atk'},
+      downAtk:  {startup:5, active:6, recover:13, dmg:4, kbBase:4, kbGrowth:0.11, kx:0.55,ky:0.38,  w:42,h:20,ox:24,oy:36, type:'atk'},
+      strong:   {startup:14,active:6, recover:20, dmg:8, kbBase:7, kbGrowth:0.18, kx:1,   ky:-0.30, w:54,h:28,ox:36,oy:10, type:'atk'},
+      grab:     {startup:8, active:6, recover:16, dmg:5, kbBase:6, kbGrowth:0.14, kx:1,   ky:-0.40, w:34,h:34,ox:26,oy:8,  type:'grab'},
+      spNeutral:{startup:12,active:9, recover:17, dmg:6, kbBase:6, kbGrowth:0.16, kx:1,   ky:-0.20, w:46,h:24,ox:36,oy:12, type:'atk'},
+      spUp:     {startup:8, active:10,recover:16, dmg:6, kbBase:7, kbGrowth:0.17, kx:0.3, ky:-1.05, w:42,h:54,ox:4, oy:-36,type:'atk'},
+      spDown:   {startup:10,active:9, recover:17, dmg:7, kbBase:7, kbGrowth:0.17, kx:0.35,ky:0.55,  w:50,h:26,ox:18,oy:36, type:'atk'},
+      spSide:   {startup:10,active:9, recover:17, dmg:7, kbBase:7, kbGrowth:0.17, kx:1.1, ky:-0.22, w:54,h:30,ox:38,oy:12, type:'atk'},
+      dashHit:  {startup:0, active:999,recover:0, dmg:4, kbBase:4, kbGrowth:0.11, kx:1,   ky:-0.20, w:42,h:30,ox:10,oy:10, type:'atk'},
+    }
+  },
 ];
 
 const ACTIONS = [
@@ -306,6 +539,9 @@ let screen = 'title';
 let selected = {p1:null, p2:null};
 let pickTurn = 'p1';
 let remapTarget = null; // {player,key,btn}
+let csMode = 'versus'; // 'versus' | 'vsai'
+let csFixedOpp = null;
+let currentMode = 'versus'; // 'versus' | 'vsai'
 
 /* ===================== SCREEN SWITCH ===================== */
 
@@ -313,6 +549,26 @@ function showScreen(name){
   screen = name;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
+}
+
+/* ===================== CONFIRM MODAL ===================== */
+
+function openConfirm(title, msg, onOk){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-msg').textContent = msg;
+  const modal = document.getElementById('modal-confirm');
+  modal.classList.add('active');
+  const okBtn = document.getElementById('modal-ok');
+  const cancelBtn = document.getElementById('modal-cancel');
+  function cleanup(){
+    modal.classList.remove('active');
+    okBtn.removeEventListener('click', okHandler);
+    cancelBtn.removeEventListener('click', cancelHandler);
+  }
+  function okHandler(){ cleanup(); onOk(); }
+  function cancelHandler(){ cleanup(); }
+  okBtn.addEventListener('click', okHandler);
+  cancelBtn.addEventListener('click', cancelHandler);
 }
 
 /* ===================== KEY CONFIG UI ===================== */
@@ -372,8 +628,10 @@ document.getElementById('btn-kc-reset').addEventListener('click', ()=>{
 
 /* ===================== CHARACTER SELECT UI ===================== */
 
-function buildCharSelect(){
-  selected = {p1:null,p2:null};
+function buildCharSelect(mode, fixedOpp){
+  csMode = mode || 'versus';
+  csFixedOpp = fixedOpp || null;
+  selected = {p1:null, p2: csMode==='vsai' ? csFixedOpp : null};
   pickTurn = 'p1';
   updateCsStatus();
   document.getElementById('btn-cs-start').disabled = true;
@@ -383,15 +641,22 @@ function buildCharSelect(){
     const card = document.createElement('div');
     card.className = 'cs-card';
     card.dataset.id = ch.id;
+    card.title = ch.trait.name + '：' + ch.trait.desc;
     card.innerHTML =
       '<div class="swatch" style="background:'+ch.color+';color:'+ch.color+'"></div>'+
       '<div class="cname">'+ch.name+'</div>'+
+      '<div class="ctrait">'+ch.trait.name+'</div>'+
       '<div class="bars">'+
         barRow('速',ch.speed)+barRow('力',ch.power)+barRow('重',ch.weight)+barRow('跳',ch.jump)+
       '</div>';
     card.addEventListener('click', ()=> pickCharacter(ch));
     grid.appendChild(card);
   });
+  if(csMode==='vsai' && csFixedOpp){
+    document.querySelectorAll('.cs-card').forEach(c=>{
+      if(c.dataset.id === csFixedOpp.id) c.classList.add('picked-p2');
+    });
+  }
 }
 function barRow(label,val){
   const pct = Math.round(val/10*100);
@@ -399,11 +664,26 @@ function barRow(label,val){
 }
 function updateCsStatus(){
   const el = document.getElementById('cs-status');
+  if(csMode==='vsai'){
+    if(!selected.p1) el.innerHTML = 'あなたのキャラクターを選んでください（対戦相手：<b>'+csFixedOpp.name+'</b> AI）';
+    else el.innerHTML = '準備完了。<b>対戦開始</b>を押してください。';
+    return;
+  }
   if(!selected.p1) el.innerHTML = '<b>PLAYER 1</b> がキャラクターを選択中...';
   else if(!selected.p2) el.innerHTML = '<b>PLAYER 2</b> がキャラクターを選択中...';
   else el.innerHTML = '両者の選択が完了しました。<b>対戦開始</b>を押してください。';
 }
 function pickCharacter(ch){
+  if(csMode==='vsai'){
+    selected.p1 = ch;
+    document.querySelectorAll('.cs-card').forEach(c=>{
+      c.classList.remove('picked-p1');
+      if(c.dataset.id === ch.id) c.classList.add('picked-p1');
+    });
+    updateCsStatus();
+    document.getElementById('btn-cs-start').disabled = false;
+    return;
+  }
   if(!selected.p1){ selected.p1 = ch; }
   else if(!selected.p2){ selected.p2 = ch; }
   else return;
@@ -415,11 +695,17 @@ function pickCharacter(ch){
   updateCsStatus();
   document.getElementById('btn-cs-start').disabled = !(selected.p1 && selected.p2);
 }
-document.getElementById('btn-to-select').addEventListener('click', ()=>{ buildCharSelect(); showScreen('select'); });
-document.getElementById('btn-cs-back').addEventListener('click', ()=> showScreen('title'));
-document.getElementById('btn-cs-reset').addEventListener('click', buildCharSelect);
-document.getElementById('btn-cs-start').addEventListener('click', ()=>{ startGame(selected.p1, selected.p2); });
-document.getElementById('btn-res-rematch').addEventListener('click', ()=>{ buildCharSelect(); showScreen('select'); });
+document.getElementById('btn-to-select').addEventListener('click', ()=>{ buildCharSelect('versus'); showScreen('select'); });
+document.getElementById('btn-cs-back').addEventListener('click', ()=> showScreen(csMode==='vsai' ? 'ml' : 'title'));
+document.getElementById('btn-cs-reset').addEventListener('click', ()=> buildCharSelect(csMode, csFixedOpp));
+document.getElementById('btn-cs-start').addEventListener('click', ()=>{
+  if(csMode==='vsai'){ startVsAiMatch(selected.p1, csFixedOpp); }
+  else { startGame(selected.p1, selected.p2); }
+});
+document.getElementById('btn-res-rematch').addEventListener('click', ()=>{
+  if(currentMode==='vsai'){ buildCharSelect('vsai', csFixedOpp); showScreen('select'); }
+  else { buildCharSelect('versus'); showScreen('select'); }
+});
 document.getElementById('btn-res-title').addEventListener('click', ()=> showScreen('title'));
 document.getElementById('backbtn').addEventListener('click', ()=>{ gameRunning=false; showScreen('title'); });
 
@@ -431,45 +717,65 @@ const CW = canvas.width, CH = canvas.height;
 const GROUND_Y = 460;
 const STAGE_L = 160, STAGE_R = 800;
 
+const mlCanvas = document.getElementById('ml-canvas');
+const mlCtx = mlCanvas.getContext('2d');
+
 const keysDown = new Set();
 let prevKeysDown = new Set();
 
-const ATTACKS = {
-  jab:      {startup:5,  active:5,  recover:10, dmg:3, kbBase:3, kbGrowth:0.10, kx:1,  ky:-0.15, w:46, h:26, ox:30, oy:14, type:'atk'},
-  upAtk:    {startup:6,  active:6,  recover:14, dmg:4, kbBase:4, kbGrowth:0.12, kx:0.25,ky:-1,    w:34, h:40, ox:6,  oy:-30,type:'atk'},
-  downAtk:  {startup:5,  active:6,  recover:14, dmg:4, kbBase:4, kbGrowth:0.10, kx:0.6, ky:0.4,   w:44, h:20, ox:26, oy:38, type:'atk'},
-  strong:   {startup:16, active:6,  recover:22, dmg:9, kbBase:8, kbGrowth:0.22, kx:1,  ky:-0.35, w:56, h:30, ox:34, oy:10, type:'atk'},
-  grab:     {startup:8,  active:6,  recover:16, dmg:5, kbBase:6, kbGrowth:0.14, kx:1,  ky:-0.4,  w:34, h:34, ox:26, oy:8,  type:'grab'},
-  spNeutral:{startup:12, active:8,  recover:18, dmg:5, kbBase:6, kbGrowth:0.16, kx:1,  ky:-0.25, w:40, h:26, ox:32, oy:12, type:'atk'},
-  spUp:     {startup:8,  active:10, recover:16, dmg:6, kbBase:7, kbGrowth:0.16, kx:0.3, ky:-1,    w:44, h:56, ox:2,  oy:-40,type:'atk'},
-  spDown:   {startup:10, active:8,  recover:18, dmg:7, kbBase:8, kbGrowth:0.18, kx:0.3, ky:0.9,   w:50, h:26, ox:16, oy:36, type:'atk'},
-  spSide:   {startup:8,  active:10, recover:16, dmg:6, kbBase:7, kbGrowth:0.15, kx:1,  ky:-0.2,  w:52, h:30, ox:36, oy:12, type:'atk'},
-  dashHit:  {startup:0,  active:999,recover:0,  dmg:3, kbBase:3, kbGrowth:0.08, kx:1,  ky:-0.2,  w:40, h:30, ox:10, oy:10, type:'atk'},
-};
-
-function makePlayer(idx, ch, x, facing, keys){
-  return {
+function makePlayer(idx, ch, x, facing, keys, isAI, aiTable){
+  const p = {
     idx, char:ch, keys,
     x, y:GROUND_Y-64, w:40, h:64, vx:0, vy:0, facing,
-    onGround:true, jumpsLeft:1,
+    onGround:true, jumpsLeft:0,
     action:'idle', actionFrame:0, activeProfile:null, hitDone:false,
     hitstun:0, invuln:0,
     damage:0, stocks:3,
     shield:100, dashDir:0,
+    isAI: !!isAI,
   };
+  if(isAI){
+    p.aiHeld = new Set();
+    p.aiPressed = new Set();
+    p.aiTimer = 0;
+    p.ai = {table:aiTable, lastState:null, lastAction:null, markSelfDmg:0, markOppDmg:0};
+  }
+  return p;
 }
 
 let P1=null, P2=null, gameRunning=false, matchOver=false;
+let matchCtx = {renderHud:true, onDeath:function(loser,winner){ endMatch(winner); }};
 
-function keyHeld(p, name){ return keysDown.has(p.keys[name]); }
-function keyPressed(p, name){ return keysDown.has(p.keys[name]) && !prevKeysDown.has(p.keys[name]); }
+function held(p, name){
+  if(p.isAI) return p.aiHeld.has(name);
+  return keysDown.has(p.keys[name]);
+}
+function pressed(p, name){
+  if(p.isAI) return p.aiPressed.has(name);
+  return keysDown.has(p.keys[name]) && !prevKeysDown.has(p.keys[name]);
+}
 
 function startGame(ch1, ch2){
-  P1 = makePlayer(1, ch1, 300, 1, keybinds.p1);
-  P2 = makePlayer(2, ch2, 620, -1, keybinds.p2);
+  currentMode = 'versus';
+  P1 = makePlayer(1, ch1, 300, 1, keybinds.p1, false);
+  P2 = makePlayer(2, ch2, 620, -1, keybinds.p2, false);
   matchOver = false;
   document.getElementById('hud-name-p1').textContent = ch1.name;
   document.getElementById('hud-name-p2').textContent = ch2.name;
+  renderStocks(P1); renderStocks(P2);
+  showScreen('game');
+  gameRunning = true;
+  keysDown.clear(); prevKeysDown.clear();
+  requestAnimationFrame(loop);
+}
+
+function startVsAiMatch(humanCh, aiCh){
+  currentMode = 'vsai';
+  P1 = makePlayer(1, humanCh, 300, 1, keybinds.p1, false);
+  P2 = makePlayer(2, aiCh, 620, -1, null, true, getAiMemory(aiCh.id).table);
+  matchOver = false;
+  document.getElementById('hud-name-p1').textContent = humanCh.name;
+  document.getElementById('hud-name-p2').textContent = aiCh.name + '（AI）';
   renderStocks(P1); renderStocks(P2);
   showScreen('game');
   gameRunning = true;
@@ -497,10 +803,12 @@ function startAction(p, name, profile){
 }
 
 function applyHit(attacker, victim, profile){
-  if(victim.invuln>0 || victim.hitDone) {}
   if(attacker.hitDone) return;
+
   if(victim.action==='guard' && profile.type!=='grab'){
-    victim.shield -= (profile.dmg*3 + 6);
+    const chip = profile.dmg*3 + 6;
+    const guardMul = victim.char.trait.id==='shieldSaver' ? 0.65 : 1;
+    victim.shield -= chip*guardMul;
     if(victim.shield<=0){
       victim.shield = 0;
       startAction(victim,'hitstun',null);
@@ -509,8 +817,26 @@ function applyHit(attacker, victim, profile){
     attacker.hitDone = true;
     return;
   }
-  victim.damage += profile.dmg;
-  const kbMag = (profile.kbBase*10 + profile.kbGrowth*victim.damage*10) * (11/victim.char.weight) * 0.06;
+
+  // スーパーアーマー: 自分の技を出している最中は弱い攻撃で怯まない
+  if(victim.char.trait.id==='superArmor' && victim.action==='attack' && victim.activeProfile && victim.activeProfile.armored && profile.dmg<=9){
+    victim.damage += profile.dmg;
+    attacker.hitDone = true;
+    return;
+  }
+
+  let dmg = profile.dmg;
+  if(victim.char.trait.id==='absorb'){ dmg = dmg*0.75; }
+  victim.damage += dmg;
+
+  let kbBase = profile.kbBase;
+  let kbGrowth = profile.kbGrowth;
+  if(attacker.char.trait.id==='rage'){ kbBase = kbBase*(1+attacker.damage/220); }
+  if(attacker.char.trait.id==='heavyHits'){ kbGrowth = kbGrowth*1.25; }
+
+  let kbMag = (kbBase*10 + kbGrowth*victim.damage*10) * (11/victim.char.weight) * 0.06;
+  if(victim.char.trait.id==='knockbackResist'){ kbMag *= 0.78; }
+
   const dirX = profile.kx * attacker.facing;
   victim.vx = dirX * kbMag * 0.5;
   victim.vy = profile.ky * kbMag * 0.5;
@@ -518,6 +844,8 @@ function applyHit(attacker, victim, profile){
   victim.hitstun = Math.min(75, Math.max(8, kbMag*3));
   victim.onGround = false;
   attacker.hitDone = true;
+
+  if(attacker.char.trait.id==='counterInvuln'){ attacker.invuln = Math.max(attacker.invuln, 14); }
 }
 
 function hurtboxOf(p){ return {x:p.x, y:p.y, w:p.w, h:p.h}; }
@@ -530,26 +858,31 @@ function hitboxOf(p, profile){
 function overlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
 
 function updatePlayer(p, opp){
+  if(p.isAI) aiTick(p, opp);
+
   const moveSpeed = p.char.speed*0.55 + 2.2;
   const jumpPower = p.char.jump*1.35 + 8;
   const dashSpeed = p.char.speed*0.85 + 6;
 
-  const canAct = (p.action==='idle' || p.action==='run');
-  const upH = keyHeld(p,'up'), downH = keyHeld(p,'down');
-  const leftH = keyHeld(p,'left'), rightH = keyHeld(p,'right');
+  const upH = held(p,'up'), downH = held(p,'down');
+  const leftH = held(p,'left'), rightH = held(p,'right');
 
   // --- state machine input ---
   if(p.action==='hitstun'){
     p.hitstun--;
-    if(p.hitstun<=0){ p.action = p.onGround ? 'idle' : 'idle'; }
+    if(p.hitstun<=0){ p.action = 'idle'; }
   } else if(p.action==='guard'){
-    if(!keyHeld(p,'guard')){ p.action='idle'; }
-    else { p.shield = Math.max(0,p.shield-0.35); if(p.shield<=0){ startAction(p,'hitstun',null); p.hitstun=90; } }
+    if(!held(p,'guard')){ p.action='idle'; }
+    else {
+      const decay = p.char.trait.id==='shieldSaver' ? 0.20 : 0.35;
+      p.shield = Math.max(0,p.shield-decay);
+      if(p.shield<=0){ startAction(p,'hitstun',null); p.hitstun=90; }
+    }
   } else if(p.action==='dash'){
     p.actionFrame++;
     p.vx = p.dashDir * dashSpeed;
-    if(p.action==='dash' && !p.hitDone && overlap(hitboxOf(p,ATTACKS.dashHit), hurtboxOf(opp))){
-      applyHit(p,opp,ATTACKS.dashHit);
+    if(p.action==='dash' && !p.hitDone && overlap(hitboxOf(p,p.char.attacks.dashHit), hurtboxOf(opp))){
+      applyHit(p,opp,p.char.attacks.dashHit);
     }
     if(p.actionFrame>16){ p.action='idle'; }
   } else if(p.action==='attack' || p.action==='special' || p.action==='grab'){
@@ -564,20 +897,20 @@ function updatePlayer(p, opp){
 
   // --- fresh input while free ---
   if(p.action==='idle' || p.action==='run'){
-    if(keyPressed(p,'grab')){ startAction(p,'grab',ATTACKS.grab); }
-    else if(keyPressed(p,'attack')){
-      if(upH) startAction(p,'attack',ATTACKS.upAtk);
-      else if(downH) startAction(p,'attack',ATTACKS.downAtk);
-      else if((leftH&&p.facing<0)||(rightH&&p.facing>0)) startAction(p,'attack',ATTACKS.strong);
-      else startAction(p,'attack',ATTACKS.jab);
-    } else if(keyPressed(p,'special')){
-      if(upH) startAction(p,'special',ATTACKS.spUp);
-      else if(downH) startAction(p,'special',ATTACKS.spDown);
-      else if(leftH||rightH) startAction(p,'special',ATTACKS.spSide);
-      else startAction(p,'special',ATTACKS.spNeutral);
-    } else if(keyPressed(p,'dash') && p.onGround){
+    if(pressed(p,'grab')){ startAction(p,'grab',p.char.attacks.grab); }
+    else if(pressed(p,'attack')){
+      if(upH) startAction(p,'attack',p.char.attacks.upAtk);
+      else if(downH) startAction(p,'attack',p.char.attacks.downAtk);
+      else if((leftH&&p.facing<0)||(rightH&&p.facing>0)) startAction(p,'attack',p.char.attacks.strong);
+      else startAction(p,'attack',p.char.attacks.jab);
+    } else if(pressed(p,'special')){
+      if(upH) startAction(p,'special',p.char.attacks.spUp);
+      else if(downH) startAction(p,'special',p.char.attacks.spDown);
+      else if(leftH||rightH) startAction(p,'special',p.char.attacks.spSide);
+      else startAction(p,'special',p.char.attacks.spNeutral);
+    } else if(pressed(p,'dash') && p.onGround){
       startAction(p,'dash',null);
-    } else if(keyHeld(p,'guard') && p.onGround){
+    } else if(held(p,'guard') && p.onGround){
       p.action='guard';
     }
   }
@@ -595,8 +928,8 @@ function updatePlayer(p, opp){
   }
 
   // jump
-  if((p.action==='idle'||p.action==='run') && keyPressed(p,'jump')){
-    if(p.onGround){ p.vy = -jumpPower; p.onGround=false; p.jumpsLeft=1; }
+  if((p.action==='idle'||p.action==='run') && pressed(p,'jump')){
+    if(p.onGround){ p.vy = -jumpPower; p.onGround=false; p.jumpsLeft = p.char.extraJumps||0; }
     else if(p.jumpsLeft>0){ p.vy = -jumpPower*0.85; p.jumpsLeft--; }
   }
 
@@ -613,92 +946,94 @@ function updatePlayer(p, opp){
   if(p.x+p.w>STAGE_L && p.x<STAGE_R && p.y+p.h>=GROUND_Y && p.vy>=0){
     p.y = GROUND_Y - p.h;
     p.vy = 0;
-    if(!p.onGround){ p.onGround = true; p.jumpsLeft=1; }
+    if(!p.onGround){ p.onGround = true; p.jumpsLeft = p.char.extraJumps||0; }
     p.onGround = true;
   } else {
     p.onGround = false;
   }
 
   if(p.invuln>0) p.invuln--;
+  if(p.isAI) p.aiPressed = new Set();
 }
 
-function checkBlast(p){
+function checkBlast(p, other){
   if(p.x+p.w < STAGE_L-160 || p.x > STAGE_R+160 || p.y > CH+160 || p.y < -260){
     p.stocks--;
-    renderStocks(p);
+    if(matchCtx.renderHud) renderStocks(p);
     p.damage = 0;
     p.x = p.idx===1 ? 300 : 620;
-    p.y = GROUND_Y-64-40;
+    p.y = GROUND_Y - p.h - 40;
     p.vx=0; p.vy=0;
     p.action='idle';
     p.invuln = 90;
-    if(p.stocks<=0){ endMatch(p.idx===1?P2:P1); }
+    if(p.stocks<=0){ matchCtx.onDeath(p, other); }
   }
 }
 
 function endMatch(winner){
   matchOver = true;
   gameRunning = false;
+  [P1,P2].forEach(p=>{ if(p && p.isAI) aiTerminalReward(p, p===winner); });
   document.getElementById('result-name').textContent = winner.char.name + ' の勝ち！';
-  document.getElementById('result-sub').textContent = 'PLAYER ' + winner.idx + ' WINS';
+  document.getElementById('result-sub').textContent = (currentMode==='vsai' && winner===P2) ? 'AI WINS' : 'PLAYER ' + winner.idx + ' WINS';
   showScreen('result');
 }
 
-function drawRoundedRect(x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y,x+w,y+h,r);
-  ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r);
-  ctx.arcTo(x,y,x+w,y,r);
-  ctx.closePath();
+function drawRoundedRect(g,x,y,w,h,r){
+  g.beginPath();
+  g.moveTo(x+r,y);
+  g.arcTo(x+w,y,x+w,y+h,r);
+  g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r);
+  g.arcTo(x,y,x+w,y,r);
+  g.closePath();
 }
 
-function drawPlayer(p){
-  ctx.save();
-  if(p.invuln>0 && Math.floor(p.invuln/4)%2===0){ ctx.globalAlpha=0.35; }
-  if(p.action==='hitstun'){ ctx.globalAlpha=0.75; }
-  ctx.fillStyle = p.char.color;
-  drawRoundedRect(p.x,p.y,p.w,p.h,10);
-  ctx.fill();
+function drawPlayer(g,p){
+  g.save();
+  if(p.invuln>0 && Math.floor(p.invuln/4)%2===0){ g.globalAlpha=0.35; }
+  if(p.action==='hitstun'){ g.globalAlpha=0.75; }
+  g.fillStyle = p.char.color;
+  drawRoundedRect(g,p.x,p.y,p.w,p.h,10);
+  g.fill();
   // face direction indicator (eye)
-  ctx.fillStyle = '#0a0912';
+  g.fillStyle = '#0a0912';
   const eyeX = p.facing>0 ? p.x+p.w-12 : p.x+4;
-  ctx.beginPath(); ctx.arc(eyeX, p.y+18, 4, 0, Math.PI*2); ctx.fill();
+  g.beginPath(); g.arc(eyeX, p.y+18, 4, 0, Math.PI*2); g.fill();
   // guard shield visual
   if(p.action==='guard'){
-    ctx.strokeStyle='rgba(255,204,51,0.8)'; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.arc(p.x+p.w/2,p.y+p.h/2,p.w*0.9,0,Math.PI*2); ctx.stroke();
+    g.strokeStyle='rgba(255,204,51,0.8)'; g.lineWidth=3;
+    g.beginPath(); g.arc(p.x+p.w/2,p.y+p.h/2,p.w*0.9,0,Math.PI*2); g.stroke();
   }
   // active hitbox debug flash
   if((p.action==='attack'||p.action==='special'||p.action==='grab') && p.activeProfile){
     const prof=p.activeProfile;
     if(p.actionFrame>=prof.startup && p.actionFrame<prof.startup+prof.active){
       const hb = hitboxOf(p,prof);
-      ctx.fillStyle = prof.type==='grab' ? 'rgba(255,204,51,0.55)' : 'rgba(255,255,255,0.5)';
-      drawRoundedRect(hb.x,hb.y,hb.w,hb.h,6); ctx.fill();
+      g.fillStyle = prof.type==='grab' ? 'rgba(255,204,51,0.55)' : 'rgba(255,255,255,0.5)';
+      drawRoundedRect(g,hb.x,hb.y,hb.w,hb.h,6); g.fill();
     }
   }
-  ctx.restore();
+  g.restore();
 }
 
-function drawStage(){
-  ctx.clearRect(0,0,CW,CH);
+function drawStage(g,cw,ch2){
+  g.clearRect(0,0,cw,ch2);
   // backdrop
-  const grad = ctx.createLinearGradient(0,0,0,CH);
+  const grad = g.createLinearGradient(0,0,0,ch2);
   grad.addColorStop(0,'#181428'); grad.addColorStop(1,'#0c0a16');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,CW,CH);
+  g.fillStyle = grad; g.fillRect(0,0,cw,ch2);
   for(let i=0;i<3;i++){
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.beginPath(); ctx.moveTo(0,120+i*90); ctx.lineTo(CW,90+i*90); ctx.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.03)';
+    g.beginPath(); g.moveTo(0,120+i*90); g.lineTo(cw,90+i*90); g.stroke();
   }
   // platform
-  ctx.fillStyle = '#221d33';
-  drawRoundedRect(STAGE_L-10, GROUND_Y, STAGE_R-STAGE_L+20, 40, 8); ctx.fill();
-  ctx.fillStyle = '#00e5ff';
-  ctx.fillRect(STAGE_L-10, GROUND_Y, STAGE_R-STAGE_L+20, 3);
-  ctx.fillStyle = 'rgba(255,47,146,0.6)';
-  ctx.fillRect(STAGE_L-10, GROUND_Y+37, STAGE_R-STAGE_L+20, 3);
+  g.fillStyle = '#221d33';
+  drawRoundedRect(g,STAGE_L-10, GROUND_Y, STAGE_R-STAGE_L+20, 40, 8); g.fill();
+  g.fillStyle = '#00e5ff';
+  g.fillRect(STAGE_L-10, GROUND_Y, STAGE_R-STAGE_L+20, 3);
+  g.fillStyle = 'rgba(255,47,146,0.6)';
+  g.fillRect(STAGE_L-10, GROUND_Y+37, STAGE_R-STAGE_L+20, 3);
 }
 
 function updateHud(){
@@ -712,18 +1047,278 @@ function updateHud(){
 
 function loop(){
   if(!gameRunning) return;
+  matchCtx = {renderHud:true, onDeath:function(loser,winner){ endMatch(winner); }};
   updatePlayer(P1,P2);
   updatePlayer(P2,P1);
-  checkBlast(P1);
-  checkBlast(P2);
+  checkBlast(P1,P2);
+  checkBlast(P2,P1);
   if(matchOver) return;
-  drawStage();
-  drawPlayer(P1);
-  drawPlayer(P2);
+  drawStage(ctx,CW,CH);
+  drawPlayer(ctx,P1);
+  drawPlayer(ctx,P2);
   updateHud();
   prevKeysDown = new Set(keysDown);
   requestAnimationFrame(loop);
 }
+
+/* ===================== AI (自己対戦・強化学習) ===================== */
+
+const AI_ACTIONS = ['approach','retreat','jumpApproach','guard','jab','strong','upAtk','downAtk','grabMove','spNeutral','spUp','spDown','spSide','dash','wait'];
+
+let aiMemoryStore = {}; // charId -> {table:{}, episodes:0}
+let totalEpisodesGlobal = 0;
+
+function getAiMemory(charId){
+  if(!aiMemoryStore[charId]) aiMemoryStore[charId] = {table:{}, episodes:0};
+  return aiMemoryStore[charId];
+}
+
+function currentEpsilon(){
+  return Math.max(0.05, 0.35 - totalEpisodesGlobal*0.0015);
+}
+
+function qGet(table,s,a){
+  const row = table[s];
+  if(!row) return 0;
+  return row[a]===undefined ? 0 : row[a];
+}
+function qSet(table,s,a,v){
+  if(!table[s]) table[s] = {};
+  table[s][a] = v;
+}
+function qUpdate(table,s,a,r,s2){
+  const alpha = 0.3, gamma = 0.9;
+  const old = qGet(table,s,a);
+  let maxNext = 0;
+  if(s2){
+    maxNext = Math.max.apply(null, AI_ACTIONS.map(a2=>qGet(table,s2,a2)));
+  }
+  qSet(table,s,a, old + alpha*(r + gamma*maxNext - old));
+}
+
+function aiStateKey(p,opp){
+  const dx = opp.x - p.x;
+  const distB = Math.abs(dx) < 70 ? 0 : (Math.abs(dx) < 220 ? 1 : 2);
+  const dy = opp.y - p.y;
+  const dyB = dy < -40 ? -1 : (dy > 40 ? 1 : 0);
+  const selfDB = p.damage<50 ? 0 : (p.damage<100 ? 1 : 2);
+  const oppDB = opp.damage<50 ? 0 : (opp.damage<100 ? 1 : 2);
+  let oppAct = 'idle';
+  if(opp.action==='attack'||opp.action==='special'||opp.action==='grab') oppAct='atk';
+  else if(opp.action==='guard') oppAct='guard';
+  else if(opp.action==='hitstun') oppAct='stun';
+  else if(!opp.onGround) oppAct='air';
+  const dirSign = dx>=0 ? 1 : 0;
+  return distB+'_'+dyB+'_'+selfDB+'_'+oppDB+'_'+oppAct+'_'+(p.onGround?1:0)+'_'+dirSign;
+}
+
+function aiChooseAction(p,s){
+  if(Math.random() < currentEpsilon()){
+    return AI_ACTIONS[Math.floor(Math.random()*AI_ACTIONS.length)];
+  }
+  let best = AI_ACTIONS[0], bv = -Infinity;
+  AI_ACTIONS.forEach(a=>{
+    const v = qGet(p.ai.table,s,a);
+    if(v>bv){ bv=v; best=a; }
+  });
+  return best;
+}
+
+function applyAiAction(p, opp, action){
+  p.aiHeld = new Set();
+  p.aiPressed = new Set();
+  const dirToOpp = (opp.x > p.x) ? 'right' : 'left';
+  const dirAway = dirToOpp==='right' ? 'left' : 'right';
+  switch(action){
+    case 'approach': p.aiHeld.add(dirToOpp); break;
+    case 'retreat': p.aiHeld.add(dirAway); break;
+    case 'jumpApproach': p.aiHeld.add(dirToOpp); p.aiPressed.add('jump'); break;
+    case 'guard': p.aiHeld.add('guard'); break;
+    case 'jab': p.aiPressed.add('attack'); break;
+    case 'strong': p.facing = dirToOpp==='right'?1:-1; p.aiHeld.add(dirToOpp); p.aiPressed.add('attack'); break;
+    case 'upAtk': p.aiHeld.add('up'); p.aiPressed.add('attack'); break;
+    case 'downAtk': p.aiHeld.add('down'); p.aiPressed.add('attack'); break;
+    case 'grabMove': p.aiPressed.add('grab'); break;
+    case 'spNeutral': p.aiPressed.add('special'); break;
+    case 'spUp': p.aiHeld.add('up'); p.aiPressed.add('special'); break;
+    case 'spDown': p.aiHeld.add('down'); p.aiPressed.add('special'); break;
+    case 'spSide': p.facing = dirToOpp==='right'?1:-1; p.aiHeld.add(dirToOpp); p.aiPressed.add('special'); break;
+    case 'dash': p.facing = dirToOpp==='right'?1:-1; p.aiPressed.add('dash'); break;
+    default: break; // wait
+  }
+}
+
+function aiTick(p, opp){
+  if(p.aiTimer===undefined) p.aiTimer = 0;
+  p.aiTimer--;
+  if(p.aiTimer>0) return;
+
+  if(p.ai.lastState!==null){
+    const dmgDealt = opp.damage - p.ai.markOppDmg;
+    const dmgTaken = p.damage - p.ai.markSelfDmg;
+    const reward = dmgDealt*1.0 - dmgTaken*1.2 - 0.05;
+    qUpdate(p.ai.table, p.ai.lastState, p.ai.lastAction, reward, aiStateKey(p,opp));
+  }
+
+  const s = aiStateKey(p,opp);
+  const a = aiChooseAction(p,s);
+  applyAiAction(p,opp,a);
+
+  p.ai.lastState = s;
+  p.ai.lastAction = a;
+  p.ai.markSelfDmg = p.damage;
+  p.ai.markOppDmg = opp.damage;
+
+  p.aiTimer = 14 + Math.floor(Math.random()*18);
+}
+
+function aiTerminalReward(p, didWin){
+  if(!p.ai || p.ai.lastState===null) return;
+  const reward = didWin ? 30 : -30;
+  qUpdate(p.ai.table, p.ai.lastState, p.ai.lastAction, reward, null);
+  p.ai.lastState = null;
+}
+
+/* ===================== AI TRAINING SCREEN ===================== */
+
+let mlSelectedChar = null;
+let trainingActive = false;
+let trainSpeed = 4;
+let trainP1 = null, trainP2 = null;
+let trainEpisodeFrames = 0;
+let trainRecentLengths = [];
+let mlStatsTick = 0;
+
+function buildMlCharRow(){
+  const row = document.getElementById('ml-charrow');
+  row.innerHTML = '';
+  CHARACTERS.forEach(ch=>{
+    const chip = document.createElement('div');
+    chip.className = 'ml-chip' + (mlSelectedChar && mlSelectedChar.id===ch.id ? ' active' : '');
+    chip.style.background = ch.color;
+    chip.textContent = ch.name.slice(0,2);
+    chip.title = ch.name + ' - ' + ch.trait.name + '：' + ch.trait.desc;
+    chip.addEventListener('click', ()=>{
+      if(trainingActive) return;
+      mlSelectedChar = ch;
+      buildMlCharRow();
+      updateMlStats();
+    });
+    row.appendChild(chip);
+  });
+}
+
+function buildSpeedButtons(){
+  const wrap = document.getElementById('ml-speedbtns');
+  wrap.innerHTML = '';
+  [1,4,8,20].forEach(v=>{
+    const b = document.createElement('button');
+    b.className = 'small' + (trainSpeed===v ? ' active' : '');
+    b.textContent = 'x'+v;
+    b.addEventListener('click', ()=>{ trainSpeed=v; buildSpeedButtons(); });
+    wrap.appendChild(b);
+  });
+}
+
+function updateMlStats(){
+  const el = document.getElementById('ml-stats');
+  if(!mlSelectedChar){ el.textContent = 'キャラクターを選んでください'; return; }
+  const mem = getAiMemory(mlSelectedChar.id);
+  const avgLen = trainRecentLengths.length ? Math.round(trainRecentLengths.reduce((a,b)=>a+b,0)/trainRecentLengths.length) : 0;
+  el.textContent =
+    '選択中: ' + mlSelectedChar.name + ' [' + mlSelectedChar.trait.name + ']\n' +
+    '特性: ' + mlSelectedChar.trait.desc + '\n' +
+    '学習済み対戦回数: ' + mem.episodes + ' 回\n' +
+    '探索率(ε): ' + currentEpsilon().toFixed(3) + '\n' +
+    '記憶している状況パターン数: ' + Object.keys(mem.table).length + '\n' +
+    (trainingActive ? ('直近の平均決着フレーム数: ' + avgLen) : '（学習停止中）');
+}
+
+function respawnTrainingPlayers(ch){
+  const mem = getAiMemory(ch.id);
+  trainP1 = makePlayer(1, ch, 300, 1, null, true, mem.table);
+  trainP2 = makePlayer(2, ch, 620, -1, null, true, mem.table);
+  trainEpisodeFrames = 0;
+}
+
+function trainingOnDeath(loser, winner){
+  trainP1 && aiTerminalReward(trainP1, trainP1===winner);
+  trainP2 && aiTerminalReward(trainP2, trainP2===winner);
+  const mem = getAiMemory(mlSelectedChar.id);
+  mem.episodes++;
+  totalEpisodesGlobal++;
+  trainRecentLengths.push(trainEpisodeFrames);
+  if(trainRecentLengths.length>30) trainRecentLengths.shift();
+  respawnTrainingPlayers(mlSelectedChar);
+}
+
+function trainLoopTick(){
+  if(!trainingActive) return;
+  matchCtx = {renderHud:false, onDeath:trainingOnDeath};
+  for(let i=0;i<trainSpeed;i++){
+    trainEpisodeFrames++;
+    updatePlayer(trainP1,trainP2);
+    updatePlayer(trainP2,trainP1);
+    checkBlast(trainP1,trainP2);
+    checkBlast(trainP2,trainP1);
+  }
+  if(document.getElementById('ml-show').checked){
+    mlCtx.save();
+    mlCtx.scale(0.5,0.5);
+    drawStage(mlCtx,CW,CH);
+    drawPlayer(mlCtx,trainP1);
+    drawPlayer(mlCtx,trainP2);
+    mlCtx.restore();
+  }
+  mlStatsTick++;
+  if(mlStatsTick % 15 === 0){ updateMlStats(); }
+  requestAnimationFrame(trainLoopTick);
+}
+
+function stopTraining(){
+  trainingActive = false;
+  document.getElementById('btn-ml-start').disabled = false;
+  document.getElementById('btn-ml-stop').disabled = true;
+  updateMlStats();
+}
+
+document.getElementById('btn-to-ml').addEventListener('click', ()=>{
+  buildMlCharRow();
+  buildSpeedButtons();
+  updateMlStats();
+  showScreen('ml');
+});
+document.getElementById('btn-ml-back').addEventListener('click', ()=>{ stopTraining(); showScreen('title'); });
+
+document.getElementById('btn-ml-start').addEventListener('click', ()=>{
+  if(!mlSelectedChar){ updateMlStats(); return; }
+  trainingActive = true;
+  document.getElementById('btn-ml-start').disabled = true;
+  document.getElementById('btn-ml-stop').disabled = false;
+  respawnTrainingPlayers(mlSelectedChar);
+  requestAnimationFrame(trainLoopTick);
+});
+document.getElementById('btn-ml-stop').addEventListener('click', stopTraining);
+
+document.getElementById('btn-ml-fight').addEventListener('click', ()=>{
+  if(!mlSelectedChar){ return; }
+  stopTraining();
+  buildCharSelect('vsai', mlSelectedChar);
+  showScreen('select');
+});
+
+document.getElementById('btn-ml-reset').addEventListener('click', ()=>{
+  openConfirm(
+    '学習データをリセット',
+    'これまでのAIの学習内容（全キャラクター分）をすべて削除します。この操作は取り消せません。よろしいですか？',
+    ()=>{
+      aiMemoryStore = {};
+      totalEpisodesGlobal = 0;
+      trainRecentLengths = [];
+      updateMlStats();
+    }
+  );
+});
 
 buildKeyConfigRows();
 })();
