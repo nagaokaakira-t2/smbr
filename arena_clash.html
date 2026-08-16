@@ -350,7 +350,7 @@ const CHARACTERS = [
       downAtk:  {startup:5, active:6, recover:13, dmg:4,  kbBase:4, kbGrowth:0.10, kx:0.6,  ky:0.40,  w:42,h:20,ox:24,oy:36, type:'atk'},
       strong:   {startup:14,active:6, recover:20, dmg:10, kbBase:9, kbGrowth:0.24, kx:1,    ky:-0.30, w:58,h:30,ox:36,oy:10, type:'atk'},
       grab:     {startup:8, active:6, recover:16, dmg:5,  kbBase:6, kbGrowth:0.14, kx:1,    ky:-0.40, w:34,h:34,ox:26,oy:8,  type:'grab'},
-      spNeutral:{kind:'projectile', startup:12,active:4, recover:18, dmg:6,  kbBase:5, kbGrowth:0.14, kx:1,  ky:-0.15, w:26,h:18, speed:9, life:55, spawnOx:26, spawnOy:0, type:'atk'},
+      spNeutral:{kind:'projectile', hbShape:'circle', startup:12,active:4, recover:18, dmg:6,  kbBase:5, kbGrowth:0.14, kx:1,  ky:-0.15, w:24,h:24, speed:9, life:55, spawnOx:26, spawnOy:0, type:'atk'},
       spUp:     {startup:7, active:9, recover:15, dmg:7,  kbBase:8, kbGrowth:0.18, kx:0.3,  ky:-1.10, w:40,h:54,ox:4, oy:-38,type:'atk'},
       spDown:   {startup:9, active:10,recover:18, dmg:6,  kbBase:6, kbGrowth:0.15, kx:0.4,  ky:0.60,  w:60,h:22,ox:20,oy:36, type:'atk'},
       spSide:   {kind:'dashAttack', startup:8, active:12,recover:16, dmg:7,  kbBase:7, kbGrowth:0.17, kx:1.1,  ky:-0.20, w:50,h:30,ox:30,oy:10, dashSpeed:11, type:'atk'},
@@ -933,6 +933,7 @@ function spawnProjectile(p, prof){
     w: prof.w, h: prof.h,
     dmg: prof.dmg, kbBase: prof.kbBase, kbGrowth: prof.kbGrowth, kx: prof.kx, ky: prof.ky,
     type:'atk', owner:p, life: prof.life||60, color:p.char.color, isTrap:false,
+    shape: prof.hbShape||'rect', ownerCharId: p.char.id,
   });
 }
 
@@ -945,6 +946,7 @@ function spawnTrap(p, prof){
     w: prof.w, h: prof.h,
     dmg: prof.dmg, kbBase: prof.kbBase, kbGrowth: prof.kbGrowth, kx: prof.kx||0.3, ky: prof.ky||-0.9,
     type:'atk', owner:p, life: prof.life||60, delay: prof.delay||10, color:p.char.color, isTrap:true,
+    shape: prof.hbShape||'rect', ownerCharId: p.char.id,
   });
 }
 
@@ -958,7 +960,7 @@ function updateProjectiles(pA, pB){
     let consumed=false;
     [pA,pB].forEach(target=>{
       if(consumed || !target || target===pr.owner) return;
-      if(overlap({x:pr.x,y:pr.y,w:pr.w,h:pr.h}, hurtboxOf(target))){
+      if(overlap({x:pr.x,y:pr.y,w:pr.w,h:pr.h,shape:pr.shape}, hurtboxOf(target))){
         if(target.action==='special' && target.activeProfile && target.activeProfile.kind==='reflector'
            && target.actionFrame>=target.activeProfile.startup && target.actionFrame<target.activeProfile.startup+target.activeProfile.active){
           pr.vx *= -1.15;
@@ -978,10 +980,34 @@ function drawProjectiles(g){
   projectiles.forEach(pr=>{
     if(pr.delay && pr.delay>0) return;
     g.save();
-    g.fillStyle = pr.color;
-    g.globalAlpha = pr.isTrap ? 0.85 : 1;
-    drawRoundedRect(g,pr.x,pr.y,pr.w,pr.h, Math.min(pr.w,pr.h)/2);
-    g.fill();
+    const cx = pr.x+pr.w/2, cy = pr.y+pr.h/2;
+    if(pr.isTrap && pr.ownerCharId==='crystal'){
+      g.fillStyle = pr.color;
+      for(let i=0;i<3;i++){
+        const ox=(i-1)*11;
+        g.beginPath();
+        g.moveTo(cx+ox, pr.y);
+        g.lineTo(cx+ox+6, cy);
+        g.lineTo(cx+ox, pr.y+pr.h);
+        g.lineTo(cx+ox-6, cy);
+        g.closePath();
+        g.fill();
+      }
+      g.strokeStyle='rgba(255,255,255,0.5)'; g.lineWidth=1;
+      g.stroke();
+    } else if(pr.ownerCharId==='blaze'){
+      g.fillStyle = 'rgba(255,204,51,0.55)';
+      g.beginPath(); g.arc(cx,cy,pr.w*0.65,0,Math.PI*2); g.fill();
+      g.fillStyle = pr.color;
+      g.beginPath(); g.arc(cx,cy,pr.w*0.5,0,Math.PI*2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.65)';
+      g.beginPath(); g.arc(cx,cy,pr.w*0.22,0,Math.PI*2); g.fill();
+    } else {
+      g.fillStyle = pr.color;
+      g.globalAlpha = pr.isTrap ? 0.85 : 1;
+      drawRoundedRect(g,pr.x,pr.y,pr.w,pr.h, Math.min(pr.w,pr.h)/2);
+      g.fill();
+    }
     g.restore();
   });
 }
@@ -991,9 +1017,18 @@ function hitboxOf(p, profile){
   const dir = p.facing;
   const x = dir>0 ? p.x + p.w/2 + profile.ox - profile.w/2 : p.x + p.w/2 - profile.ox - profile.w/2;
   const y = p.y + p.h/2 + profile.oy - profile.h/2;
-  return {x,y,w:profile.w,h:profile.h};
+  return {x,y,w:profile.w,h:profile.h, shape:profile.hbShape||'rect'};
 }
-function overlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+function overlap(a,b){
+  if(a.shape==='circle'){
+    const cx=a.x+a.w/2, cy=a.y+a.h/2, r=Math.min(a.w,a.h)/2;
+    const nx = Math.max(b.x, Math.min(cx,b.x+b.w));
+    const ny = Math.max(b.y, Math.min(cy,b.y+b.h));
+    const dx=cx-nx, dy=cy-ny;
+    return (dx*dx+dy*dy) <= r*r;
+  }
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
 
 function updatePlayer(p, opp){
   if(p.isAI) aiTick(p, opp);
@@ -1151,17 +1186,311 @@ function drawRoundedRect(g,x,y,w,h,r){
   g.closePath();
 }
 
+function drawCharacterBody(g,p){
+  const w=p.w, h=p.h, facing=p.facing;
+  const cx = p.x + w/2;      // 中心x(接地位置は変えない)
+  const bot = p.y + h;        // 足元(接地面)は常に揃える
+  g.fillStyle = p.char.color;
+  switch(p.char.id){
+    case 'blaze': { // 細身でくびれた大きな一枚炎、先端が揺らぐ
+      const vw=w*0.95, vh=h*1.08;
+      const top = bot-vh;
+      g.beginPath();
+      g.moveTo(cx-vw*0.32, bot);
+      g.bezierCurveTo(cx-vw*0.55, bot-vh*0.45, cx-vw*0.1, bot-vh*0.55, cx-vw*0.04, top+vh*0.18);
+      g.quadraticCurveTo(cx+vw*0.02, top-2, cx+vw*0.14, top+vh*0.1);
+      g.bezierCurveTo(cx+vw*0.05, bot-vh*0.55, cx+vw*0.5, bot-vh*0.5, cx+vw*0.32, bot);
+      g.closePath(); g.fill();
+      g.fillStyle='rgba(255,255,255,0.32)';
+      g.beginPath();
+      g.moveTo(cx-vw*0.12, bot);
+      g.bezierCurveTo(cx-vw*0.2, bot-vh*0.5, cx-vw*0.02, bot-vh*0.55, cx, top+vh*0.32);
+      g.bezierCurveTo(cx+vw*0.1, bot-vh*0.5, cx+vw*0.18, bot-vh*0.35, cx+vw*0.1, bot);
+      g.closePath(); g.fill();
+      break;
+    }
+    case 'aqua': { // まん丸に近い水滴(横広・低め)
+      const vw=w*1.5, vh=h*0.72;
+      const top = bot-vh;
+      g.beginPath();
+      g.ellipse(cx, bot-vh*0.48, vw*0.5, vh*0.5, 0, 0, Math.PI*2);
+      g.fill();
+      g.strokeStyle='rgba(255,255,255,0.55)'; g.lineWidth=2;
+      g.beginPath();
+      g.moveTo(cx-vw*0.35, top+vh*0.4);
+      g.quadraticCurveTo(cx-vw*0.1, top+vh*0.22, cx+vw*0.15, top+vh*0.38);
+      g.quadraticCurveTo(cx+vw*0.3, top+vh*0.48, cx+vw*0.4, top+vh*0.38);
+      g.stroke();
+      break;
+    }
+    case 'volt': { // 細長い稲妻(w狭くh長い)
+      const vw=w*0.8, vh=h*1.12;
+      const top=bot-vh, L=p.x+w/2-vw/2, R=L+vw;
+      g.beginPath();
+      g.moveTo(L+vw*0.62,top);
+      g.lineTo(L+vw*0.1,top+vh*0.44);
+      g.lineTo(L+vw*0.42,top+vh*0.44);
+      g.lineTo(L+vw*0.02,bot);
+      g.lineTo(L+vw*0.72,top+vh*0.48);
+      g.lineTo(L+vw*0.4,top+vh*0.48);
+      g.lineTo(L+vw*0.98,top);
+      g.closePath(); g.fill();
+      break;
+    }
+    case 'rock': { // 低くて横に大きい岩塊
+      const vw=w*1.75, vh=h*0.64;
+      const top=bot-vh, L=cx-vw/2;
+      g.beginPath();
+      g.moveTo(L+vw*0.22,top);
+      g.lineTo(L+vw*0.78,top+vh*0.08);
+      g.lineTo(L+vw,top+vh*0.5);
+      g.lineTo(L+vw*0.85,bot);
+      g.lineTo(L+vw*0.15,bot);
+      g.lineTo(L,top+vh*0.5);
+      g.closePath(); g.fill();
+      g.strokeStyle='rgba(0,0,0,0.25)'; g.lineWidth=1.5;
+      g.beginPath(); g.moveTo(L+vw*0.22,top); g.lineTo(L+vw*0.42,top+vh*0.55); g.lineTo(L+vw*0.15,bot); g.stroke();
+      g.beginPath(); g.moveTo(L+vw,top+vh*0.5); g.lineTo(L+vw*0.6,top+vh*0.55); g.stroke();
+      break;
+    }
+    case 'shadow': { // 頭は細く尖り、裾が大きく広がるローブ+旗めくマント
+      const vw=w*1.35, vh=h*1.1;
+      const top=bot-vh, L=cx-vw/2;
+      // マント(進行方向と逆側にはためく)
+      g.save(); g.globalAlpha*=0.55;
+      g.beginPath();
+      g.moveTo(cx-facing*vw*0.05, top+vh*0.3);
+      g.quadraticCurveTo(cx-facing*vw*0.7, top+vh*0.5, cx-facing*vw*0.5, bot);
+      g.quadraticCurveTo(cx-facing*vw*0.15, bot-vh*0.15, cx, bot-vh*0.1);
+      g.closePath(); g.fill();
+      g.restore();
+      g.fillStyle = p.char.color;
+      g.beginPath();
+      g.moveTo(cx,top);
+      g.quadraticCurveTo(L+vw*0.22,top+vh*0.18, L+vw*0.12, top+vh*0.5);
+      g.quadraticCurveTo(L, bot-vh*0.1, L+vw*0.22, bot);
+      g.lineTo(L+vw*0.78,bot);
+      g.quadraticCurveTo(L+vw, bot-vh*0.1, L+vw*0.88, top+vh*0.5);
+      g.quadraticCurveTo(L+vw*0.78, top+vh*0.18, cx, top);
+      g.closePath(); g.fill();
+      break;
+    }
+    case 'mist': { // 横に大きく広がる霞んだ層(縦は低め)
+      const vw=w*1.7, vh=h*0.85;
+      const top=bot-vh;
+      g.save(); g.globalAlpha *= 0.5;
+      g.beginPath(); g.ellipse(cx-vw*0.15, top+vh*0.28, vw*0.34, vh*0.2, 0,0,Math.PI*2); g.fill();
+      g.restore();
+      g.save(); g.globalAlpha *= 0.42;
+      g.beginPath(); g.ellipse(cx+vw*0.16, top+vh*0.5, vw*0.4, vh*0.24, 0,0,Math.PI*2); g.fill();
+      g.restore();
+      g.save(); g.globalAlpha *= 0.72;
+      g.beginPath(); g.ellipse(cx, bot-vh*0.12, vw*0.3, vh*0.14, 0,0,Math.PI*2); g.fill();
+      g.restore();
+      break;
+    }
+    case 'ember': { // 横に大きく広がるギザギザの炎冠(ブレイズより低く幅広)
+      const vw=w*1.4, vh=h*0.92;
+      const top=bot-vh, L=cx-vw/2;
+      g.beginPath();
+      g.moveTo(cx,top);
+      g.lineTo(L+vw*0.68,top+vh*0.26);
+      g.lineTo(L+vw*0.9,top+vh*0.12);
+      g.lineTo(L+vw*0.78,top+vh*0.55);
+      g.lineTo(L+vw,top+vh*0.6);
+      g.lineTo(L+vw*0.82,bot);
+      g.lineTo(L+vw*0.18,bot);
+      g.lineTo(L,top+vh*0.6);
+      g.lineTo(L+vw*0.22,top+vh*0.55);
+      g.lineTo(L+vw*0.1,top+vh*0.12);
+      g.lineTo(L+vw*0.32,top+vh*0.26);
+      g.closePath(); g.fill();
+      break;
+    }
+    case 'steel': { // 縦長でがっしりした角ばった装甲
+      const vw=w*1.05, vh=h*1.12;
+      const top=bot-vh, L=cx-vw/2;
+      drawRoundedRect(g,L,top,vw,vh,3); g.fill();
+      g.strokeStyle='rgba(0,0,0,0.35)'; g.lineWidth=1.5;
+      g.beginPath(); g.moveTo(L,top+vh*0.32); g.lineTo(L+vw,top+vh*0.32); g.stroke();
+      g.beginPath(); g.moveTo(L,top+vh*0.66); g.lineTo(L+vw,top+vh*0.66); g.stroke();
+      g.fillStyle='rgba(0,0,0,0.3)';
+      [0.2,0.5,0.8].forEach(fx=>{ g.beginPath(); g.arc(L+vw*fx,top+vh*0.13,2,0,Math.PI*2); g.fill(); });
+      break;
+    }
+    case 'gale': { // 極細で縦に高いスマートな体、後方に翼のような線
+      const vw=w*0.5, vh=h*1.18;
+      const top=bot-vh;
+      g.save();
+      g.globalAlpha *= 0.5;
+      const wdir=-facing;
+      g.beginPath();
+      g.moveTo(cx, top+vh*0.28);
+      g.quadraticCurveTo(cx+wdir*w*1.0, top+vh*0.05, cx+wdir*w*1.5, top+vh*0.35);
+      g.quadraticCurveTo(cx+wdir*w*0.75, top+vh*0.42, cx, top+vh*0.55);
+      g.closePath(); g.fill();
+      g.restore();
+      g.fillStyle = p.char.color;
+      g.beginPath();
+      g.moveTo(cx,top);
+      g.quadraticCurveTo(cx+vw*0.55,top+vh*0.35, cx+vw*0.42,bot);
+      g.lineTo(cx-vw*0.42,bot);
+      g.quadraticCurveTo(cx-vw*0.55,top+vh*0.35, cx,top);
+      g.closePath(); g.fill();
+      break;
+    }
+    case 'crystal': { // 横に大きく広い八角形カットの宝石
+      const vw=w*1.55, vh=h*0.82;
+      const top=bot-vh, L=cx-vw/2;
+      g.beginPath();
+      g.moveTo(cx,top);
+      g.lineTo(L+vw*0.82,top+vh*0.22);
+      g.lineTo(L+vw,top+vh*0.6);
+      g.lineTo(L+vw*0.72,bot);
+      g.lineTo(L+vw*0.28,bot);
+      g.lineTo(L,top+vh*0.6);
+      g.lineTo(L+vw*0.18,top+vh*0.22);
+      g.closePath(); g.fill();
+      g.strokeStyle='rgba(255,255,255,0.5)'; g.lineWidth=1;
+      g.beginPath(); g.moveTo(cx,top); g.lineTo(cx,bot); g.stroke();
+      g.beginPath(); g.moveTo(L+vw*0.18,top+vh*0.22); g.lineTo(L+vw*0.82,top+vh*0.22); g.stroke();
+      break;
+    }
+    default: {
+      drawRoundedRect(g,p.x,p.y,w,h,10); g.fill();
+    }
+  }
+}
+
+function drawAttackEffect(g,p,prof){
+  const hb = hitboxOf(p,prof);
+  const cx = hb.x+hb.w/2, cy = hb.y+hb.h/2;
+  const t = p.actionFrame;
+  g.save();
+  switch(p.char.id){
+    case 'blaze': {
+      for(let i=0;i<4;i++){
+        const a = t*0.5+i*1.6;
+        const r = 6+(i%2)*4;
+        g.fillStyle = i%2===0 ? 'rgba(255,90,54,0.85)' : 'rgba(255,204,51,0.9)';
+        g.beginPath();
+        g.arc(cx+Math.cos(a)*hb.w*0.25, cy+Math.sin(a)*hb.h*0.25, r, 0, Math.PI*2);
+        g.fill();
+      }
+      break;
+    }
+    case 'aqua': {
+      g.strokeStyle='rgba(47,184,255,0.9)'; g.lineWidth=3; g.lineCap='round';
+      for(let i=0;i<3;i++){
+        const ang = -0.6+i*0.6;
+        g.beginPath();
+        g.moveTo(cx,cy);
+        g.quadraticCurveTo(cx+Math.cos(ang)*hb.w*0.4, cy+Math.sin(ang)*hb.h*0.4-6, cx+Math.cos(ang)*hb.w*0.6, cy+Math.sin(ang)*hb.h*0.6);
+        g.stroke();
+      }
+      break;
+    }
+    case 'volt': {
+      g.strokeStyle='rgba(255,225,77,0.95)'; g.lineWidth=2.5; g.lineJoin='round';
+      g.beginPath();
+      g.moveTo(hb.x, cy-8);
+      g.lineTo(cx-6, cy);
+      g.lineTo(cx+4, cy-6);
+      g.lineTo(hb.x+hb.w, cy+8);
+      g.stroke();
+      break;
+    }
+    case 'rock': {
+      g.fillStyle='rgba(169,123,79,0.9)';
+      for(let i=0;i<5;i++){
+        const a = i*1.3+t*0.2;
+        const dx = Math.cos(a)*hb.w*0.35, dy = Math.sin(a)*hb.h*0.35;
+        g.save(); g.translate(cx+dx,cy+dy); g.rotate(a);
+        g.fillRect(-4,-4,8,8);
+        g.restore();
+      }
+      break;
+    }
+    case 'shadow': {
+      g.strokeStyle='rgba(138,92,255,0.9)'; g.lineWidth=4; g.lineCap='round';
+      g.beginPath();
+      g.arc(cx,cy, hb.w*0.45, -0.8, 0.8);
+      g.stroke();
+      break;
+    }
+    case 'mist': {
+      g.fillStyle='rgba(127,224,201,0.5)';
+      for(let i=0;i<3;i++){
+        g.beginPath();
+        g.arc(cx+(i-1)*10, cy, 9+(t%10), 0, Math.PI*2);
+        g.fill();
+      }
+      break;
+    }
+    case 'ember': {
+      g.fillStyle='rgba(255,63,107,0.9)';
+      g.beginPath();
+      const spikes=6, outerR=hb.w*0.4, innerR=hb.w*0.18;
+      for(let i=0;i<spikes*2;i++){
+        const a = (Math.PI/spikes)*i - t*0.1;
+        const r = i%2===0 ? outerR : innerR;
+        const px = cx+Math.cos(a)*r, py=cy+Math.sin(a)*r;
+        if(i===0) g.moveTo(px,py); else g.lineTo(px,py);
+      }
+      g.closePath(); g.fill();
+      break;
+    }
+    case 'steel': {
+      g.strokeStyle='rgba(255,255,255,0.9)'; g.lineWidth=2;
+      g.beginPath();
+      g.moveTo(cx-10,cy); g.lineTo(cx+10,cy);
+      g.moveTo(cx,cy-10); g.lineTo(cx,cy+10);
+      g.moveTo(cx-7,cy-7); g.lineTo(cx+7,cy+7);
+      g.moveTo(cx-7,cy+7); g.lineTo(cx+7,cy-7);
+      g.stroke();
+      break;
+    }
+    case 'gale': {
+      g.strokeStyle='rgba(93,255,160,0.85)'; g.lineWidth=2; g.lineCap='round';
+      for(let i=0;i<3;i++){
+        g.beginPath();
+        g.arc(cx-(p.facing*i*8), cy, 6+i*4, -0.9,0.9);
+        g.stroke();
+      }
+      break;
+    }
+    case 'crystal': {
+      g.fillStyle='rgba(255,143,240,0.85)';
+      for(let i=0;i<4;i++){
+        const a=i*(Math.PI/2)+t*0.15;
+        const dx=Math.cos(a)*hb.w*0.3, dy=Math.sin(a)*hb.h*0.3;
+        g.save(); g.translate(cx+dx,cy+dy); g.rotate(a);
+        g.beginPath(); g.moveTo(0,-5); g.lineTo(4,0); g.lineTo(0,5); g.lineTo(-4,0); g.closePath(); g.fill();
+        g.restore();
+      }
+      break;
+    }
+    default: {
+      g.fillStyle='rgba(255,255,255,0.5)';
+      drawRoundedRect(g,hb.x,hb.y,hb.w,hb.h,6); g.fill();
+    }
+  }
+  if(prof.type==='grab'){
+    g.strokeStyle='rgba(255,204,51,0.8)'; g.lineWidth=2;
+    g.beginPath(); g.arc(cx,cy,Math.max(hb.w,hb.h)/2,0,Math.PI*2); g.stroke();
+  }
+  g.restore();
+}
+
 function drawPlayer(g,p){
   g.save();
   if(p.invuln>0 && Math.floor(p.invuln/4)%2===0){ g.globalAlpha=0.35; }
   if(p.action==='hitstun'){ g.globalAlpha=0.75; }
-  g.fillStyle = p.char.color;
-  drawRoundedRect(g,p.x,p.y,p.w,p.h,10);
-  g.fill();
+  drawCharacterBody(g,p);
   // face direction indicator (eye)
   g.fillStyle = '#0a0912';
-  const eyeX = p.facing>0 ? p.x+p.w-12 : p.x+4;
-  g.beginPath(); g.arc(eyeX, p.y+18, 4, 0, Math.PI*2); g.fill();
+  const eyeX = p.x + p.w/2 + p.facing*10;
+  g.beginPath(); g.arc(eyeX, p.y+16, 4, 0, Math.PI*2); g.fill();
   // guard shield visual
   if(p.action==='guard'){
     g.strokeStyle='rgba(255,204,51,0.8)'; g.lineWidth=3;
@@ -1182,13 +1511,12 @@ function drawPlayer(g,p){
       g.beginPath(); g.arc(p.x+p.w/2,p.y+p.h/2,r,0,Math.PI*2); g.fill();
     }
   }
-  // active hitbox debug flash
+  // 攻撃エフェクト(キャラごとに専用の演出)
   if((p.action==='attack'||p.action==='special'||p.action==='grab') && p.activeProfile){
     const prof=p.activeProfile;
-    if(p.actionFrame>=prof.startup && p.actionFrame<prof.startup+prof.active){
-      const hb = hitboxOf(p,prof);
-      g.fillStyle = prof.type==='grab' ? 'rgba(255,204,51,0.55)' : 'rgba(255,255,255,0.5)';
-      drawRoundedRect(g,hb.x,hb.y,hb.w,hb.h,6); g.fill();
+    const skip = ['projectile','trap','counter','reflector','charge'].indexOf(prof.kind)>=0;
+    if(!skip && p.actionFrame>=prof.startup && p.actionFrame<prof.startup+prof.active){
+      drawAttackEffect(g,p,prof);
     }
   }
   g.restore();
