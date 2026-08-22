@@ -51,8 +51,9 @@
   .selectRow{ display:flex; gap:40px; }
   .fighterCol{
     display:flex; flex-direction:column; align-items:center; gap:10px;
-    border:1px solid var(--grid); padding:16px; border-radius:4px; background:rgba(16,21,42,0.5); width:220px;
+    border:1px solid var(--grid); padding:16px; border-radius:4px; background:rgba(16,21,42,0.5); width:250px;
   }
+  .charDesc{ font-size:10px; color:var(--dim); line-height:1.7; text-align:left; min-height:56px; }
   .fighterCol h3{ font-family:'Orbitron',sans-serif; font-size:14px; letter-spacing:2px; margin:0; }
   .chips{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
   .chip{
@@ -73,6 +74,16 @@
   button.ghost{
     font-family:'Space Mono',monospace; background:transparent; border:1px solid var(--grid); color:var(--dim);
     padding:8px 18px; border-radius:2px; cursor:pointer; letter-spacing:1px; font-size:11px;
+  }
+  .keyRow{ display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; font-size:11px; color:var(--dim); }
+  .keyBtn{
+    font-family:'Space Mono',monospace; background:rgba(255,255,255,0.03); border:1px solid var(--grid); color:var(--text);
+    padding:6px 14px; border-radius:3px; cursor:pointer; min-width:74px; letter-spacing:1px;
+  }
+  .keyBtn.listening{ border-color:var(--gold); color:var(--gold); animation:blink 0.8s infinite; }
+  .keyConfigCol{
+    display:flex; flex-direction:column; gap:10px;
+    border:1px solid var(--grid); padding:16px 22px; border-radius:4px; background:rgba(16,21,42,0.5); width:280px;
   }
   #hud{ position:absolute; top:0; left:0; width:100%; padding:10px 16px; display:flex; justify-content:space-between; z-index:4; pointer-events:none; }
   .stat{ font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:1px; }
@@ -105,11 +116,27 @@
     <h1 class="logo">NEON<span>ARENA</span></h1>
     <div class="sub">乱闘フィジックス・ファイター</div>
     <div class="panel">
-      <div><b>操作方法 — PLAYER 1</b>：A/D 移動｜W ジャンプ｜S シールド｜F 攻撃｜G つかみ</div>
-      <div><b>操作方法 — PLAYER 2</b>：←/→ 移動｜↑ ジャンプ｜↓ シールド｜Enter 攻撃｜Shift つかみ</div>
+      <div><b>操作方法 — PLAYER 1</b>：A/D 移動｜W ジャンプ｜S ガード｜F 攻撃｜R スマッシュ｜G つかみ</div>
+      <div><b>操作方法 — PLAYER 2</b>：←/→ 移動｜↑ ジャンプ｜↓ ガード｜Enter 攻撃｜/ スマッシュ｜Shift つかみ</div>
+      <div>攻撃キー単体＝弱攻撃（jab）｜方向＋攻撃＝強攻撃（ftilt/utilt/dtilt）｜スマッシュキー＝スマッシュ攻撃（fsmash）｜空中で攻撃＝空中攻撃（nair）｜空中で↑＋攻撃 or ↑＋スマッシュ＝上必殺技（upB）</div>
       <div>ダメージ%が高いほど吹っ飛びが大きくなる。画面外（バーストライン）に出たら撃墜。</div>
     </div>
     <div class="blink">PRESS SPACE TO START</div>
+    <button class="ghost" id="openKeyConfigBtn">キー設定</button>
+  </div>
+
+  <div id="keyConfigScreen" class="screen hidden">
+    <h1 class="logo" style="font-size:28px;">KEY CONFIG</h1>
+    <div class="sub">ボタンをクリックしてから、割り当てたいキーを押してください</div>
+    <div class="selectRow">
+      <div class="keyConfigCol" id="p1keyconfig">
+        <h3 style="color:var(--cyan); font-family:'Orbitron',sans-serif; font-size:14px; margin:0 0 4px;">PLAYER 1</h3>
+      </div>
+      <div class="keyConfigCol" id="p2keyconfig">
+        <h3 style="color:var(--magenta); font-family:'Orbitron',sans-serif; font-size:14px; margin:0 0 4px;">PLAYER 2</h3>
+      </div>
+    </div>
+    <button class="ghost" id="closeKeyConfigBtn">戻る</button>
   </div>
 
   <div id="selectScreen" class="screen hidden">
@@ -118,11 +145,13 @@
       <div class="fighterCol">
         <h3 style="color:var(--cyan)">PLAYER 1</h3>
         <div class="chips" id="p1types"></div>
+        <div class="charDesc" id="p1desc"></div>
         <div class="swatches" id="p1colors"></div>
       </div>
       <div class="fighterCol">
         <h3 style="color:var(--magenta)">PLAYER 2</h3>
         <div class="chips" id="p2types"></div>
+        <div class="charDesc" id="p2desc"></div>
         <div class="swatches" id="p2colors"></div>
         <div class="chips"><div class="chip" id="cpuToggle">CPU: OFF</div></div>
       </div>
@@ -154,25 +183,138 @@ const STAGE = {
   blast: {left:-140, right:W+140, top:-180, bottom:H+140},
 };
 const GRAVITY = 0.62, FALL_GRAVITY_MULT = 1.0, MAX_FALL = 13;
-const FIGHTER_TYPES = {
-  balanced: {label:'BALANCED', weight:100, speed:4.2, jump:12.5, dash:6.2, size:34},
-  heavy:    {label:'HEAVY',    weight:140, speed:3.3, jump:11.2, dash:5.2, size:40},
-  light:    {label:'LIGHT',    weight:70,  speed:5.1, jump:13.6, dash:7.2, size:28},
+
+// ---------- CHARACTER DATA (data-driven move system) ----------
+// Each character: base stats + `moves` map. The engine reads these values
+// generically via executeMove() / updateAttackHitbox() — no per-character code.
+// Characters differ not just in numbers but in shape: GOLEM hits slow & huge,
+// KITSUNE is fast & flat for combos, LANCER trades speed for reach, SYLPH
+// gives up ground game for an extra jump and a dominant aerial/upB.
+const CHARACTERS = {
+  golem: {
+    label: 'GOLEM', desc: '圧倒的な重さと火力。技は遅く隙も大きいが、当たれば大きく吹っ飛ばせる。復帰(upB)は控えめ。',
+    weight: 150, walkSpeed: 2.9, dashSpeed: 4.6, jumpPower: 10.6, size: 42, extraJumps: 1,
+    moves: {
+      jab:    { damage:7,  knockbackBase:4,  knockbackScaling:0.16, angle:42, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:8,  activeFrames:5, endLagFrames:14 },
+      ftilt:  { damage:10, knockbackBase:6,  knockbackScaling:0.20, angle:30, hitboxSize:{w:58,h:26}, hitboxOffset:{x:40,y:-30}, startupFrames:11, activeFrames:6, endLagFrames:20 },
+      utilt:  { damage:9,  knockbackBase:6,  knockbackScaling:0.20, angle:84, hitboxSize:{w:36,h:50}, hitboxOffset:{x:14,y:-64}, startupFrames:10, activeFrames:5, endLagFrames:18 },
+      dtilt:  { damage:8,  knockbackBase:5,  knockbackScaling:0.18, angle:8,  hitboxSize:{w:54,h:14}, hitboxOffset:{x:34,y:-6},  startupFrames:9,  activeFrames:5, endLagFrames:18 },
+      fsmash: { damage:22, knockbackBase:13, knockbackScaling:0.34, angle:27, hitboxSize:{w:70,h:32}, hitboxOffset:{x:46,y:-30}, startupFrames:20, activeFrames:6, endLagFrames:34 },
+      nair:   { damage:12, knockbackBase:6,  knockbackScaling:0.20, angle:48, hitboxSize:{w:56,h:56}, hitboxOffset:{x:0,y:-32},  startupFrames:7,  activeFrames:8, endLagFrames:16 },
+      upB:    { damage:13, knockbackBase:7,  knockbackScaling:0.20, angle:90, hitboxSize:{w:46,h:46}, hitboxOffset:{x:0,y:-44},  startupFrames:6,  activeFrames:8, endLagFrames:12, recoveryVx:1.8, recoveryVy:12.5 },
+    }
+  },
+  kitsune: {
+    label: 'KITSUNE', desc: '軽量で技の発生が非常に速い。手数と連係で攻めるスタイルで、威力と吹っ飛びは控えめ。',
+    weight: 64, walkSpeed: 5.0, dashSpeed: 7.6, jumpPower: 13.8, size: 27, extraJumps: 1,
+    moves: {
+      jab:    { damage:3, knockbackBase:1.6, knockbackScaling:0.10, angle:40, hitboxSize:{w:28,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:2, activeFrames:3,  endLagFrames:6 },
+      ftilt:  { damage:5, knockbackBase:2.4, knockbackScaling:0.13, angle:22, hitboxSize:{w:38,h:16}, hitboxOffset:{x:26,y:-20}, startupFrames:4, activeFrames:4,  endLagFrames:9 },
+      utilt:  { damage:5, knockbackBase:2.6, knockbackScaling:0.14, angle:80, hitboxSize:{w:24,h:32}, hitboxOffset:{x:10,y:-42}, startupFrames:4, activeFrames:4,  endLagFrames:9 },
+      dtilt:  { damage:4, knockbackBase:2,   knockbackScaling:0.12, angle:14, hitboxSize:{w:32,h:10}, hitboxOffset:{x:22,y:-6},  startupFrames:3, activeFrames:4,  endLagFrames:8 },
+      fsmash: { damage:11,knockbackBase:5.5, knockbackScaling:0.24, angle:32, hitboxSize:{w:42,h:18}, hitboxOffset:{x:30,y:-20}, startupFrames:9, activeFrames:5,  endLagFrames:17 },
+      nair:   { damage:7, knockbackBase:3,   knockbackScaling:0.13, angle:40, hitboxSize:{w:38,h:38}, hitboxOffset:{x:0,y:-20},  startupFrames:3, activeFrames:10, endLagFrames:8 },
+      upB:    { damage:6, knockbackBase:3.2, knockbackScaling:0.13, angle:70, hitboxSize:{w:28,h:28}, hitboxOffset:{x:0,y:-28},  startupFrames:3, activeFrames:6,  endLagFrames:6, recoveryVx:4.6, recoveryVy:16 },
+    }
+  },
+  lancer: {
+    label: 'LANCER', desc: '槍のように長いリーチが武器。差し合いと崖際の攻防が得意だが、スマッシュは大振りで隙が大きい。',
+    weight: 98, walkSpeed: 3.6, dashSpeed: 5.6, jumpPower: 11.8, size: 34, extraJumps: 1,
+    moves: {
+      jab:    { damage:6, knockbackBase:3,   knockbackScaling:0.16, angle:35, hitboxSize:{w:34,h:18}, hitboxOffset:{x:40,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:12 },
+      ftilt:  { damage:8, knockbackBase:4,   knockbackScaling:0.16, angle:15, hitboxSize:{w:70,h:16}, hitboxOffset:{x:56,y:-24}, startupFrames:8, activeFrames:5, endLagFrames:16 },
+      utilt:  { damage:7, knockbackBase:4,   knockbackScaling:0.16, angle:88, hitboxSize:{w:20,h:60}, hitboxOffset:{x:14,y:-64}, startupFrames:8, activeFrames:5, endLagFrames:15 },
+      dtilt:  { damage:6, knockbackBase:3.5, knockbackScaling:0.14, angle:10, hitboxSize:{w:66,h:12}, hitboxOffset:{x:50,y:-6},  startupFrames:7, activeFrames:5, endLagFrames:15 },
+      fsmash: { damage:17,knockbackBase:9,   knockbackScaling:0.28, angle:24, hitboxSize:{w:86,h:20}, hitboxOffset:{x:62,y:-24}, startupFrames:19,activeFrames:6, endLagFrames:32 },
+      nair:   { damage:9, knockbackBase:4.5, knockbackScaling:0.16, angle:44, hitboxSize:{w:60,h:40}, hitboxOffset:{x:20,y:-26}, startupFrames:6, activeFrames:7, endLagFrames:14 },
+      upB:    { damage:9, knockbackBase:5,   knockbackScaling:0.16, angle:75, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34},  startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:3, recoveryVy:14 },
+    }
+  },
+  sylph: {
+    label: 'SYLPH', desc: '空中ジャンプが1回多く非常に浮遊力が高い。地上技は控えめだが空中攻撃と上必殺技が強力。',
+    weight: 76, walkSpeed: 4.2, dashSpeed: 6.2, jumpPower: 14.6, size: 30, extraJumps: 2,
+    moves: {
+      jab:    { damage:3, knockbackBase:1.4, knockbackScaling:0.10, angle:40, hitboxSize:{w:26,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:3,  activeFrames:3,  endLagFrames:7 },
+      ftilt:  { damage:5, knockbackBase:2,   knockbackScaling:0.12, angle:28, hitboxSize:{w:34,h:16}, hitboxOffset:{x:24,y:-20}, startupFrames:5,  activeFrames:4,  endLagFrames:10 },
+      utilt:  { damage:6, knockbackBase:2.2, knockbackScaling:0.11, angle:85, hitboxSize:{w:28,h:34}, hitboxOffset:{x:10,y:-44}, startupFrames:5,  activeFrames:5,  endLagFrames:10 },
+      dtilt:  { damage:4, knockbackBase:1.8, knockbackScaling:0.11, angle:14, hitboxSize:{w:30,h:10}, hitboxOffset:{x:20,y:-6},  startupFrames:4,  activeFrames:4,  endLagFrames:9 },
+      fsmash: { damage:12,knockbackBase:5,   knockbackScaling:0.22, angle:30, hitboxSize:{w:40,h:18}, hitboxOffset:{x:28,y:-20}, startupFrames:10, activeFrames:5,  endLagFrames:18 },
+      nair:   { damage:13,knockbackBase:6.5, knockbackScaling:0.22, angle:50, hitboxSize:{w:58,h:58}, hitboxOffset:{x:0,y:-30},  startupFrames:5,  activeFrames:12, endLagFrames:12 },
+      upB:    { damage:7, knockbackBase:3.5, knockbackScaling:0.14, angle:85, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-34},  startupFrames:4,  activeFrames:10, endLagFrames:8, recoveryVx:5.4, recoveryVy:18 },
+    }
+  }
 };
 const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a'];
+
 
 // ---------- INPUT ----------
 const keysDown = new Set();
 const keysPressed = new Set(); // edge-triggered, cleared each tick
+let awaitingBind = null; // {player:'p1'|'p2', action, buttonEl} while a rebind is in progress
+
 window.addEventListener('keydown', e=>{
+  if(awaitingBind){
+    e.preventDefault();
+    if(e.code === 'Escape'){
+      awaitingBind.buttonEl.textContent = labelForKey(KEY_BINDINGS[awaitingBind.player][awaitingBind.action]);
+    } else {
+      KEY_BINDINGS[awaitingBind.player][awaitingBind.action] = e.code;
+      awaitingBind.buttonEl.textContent = labelForKey(e.code);
+    }
+    awaitingBind.buttonEl.classList.remove('listening');
+    awaitingBind = null;
+    return;
+  }
   if(!keysDown.has(e.code)) keysPressed.add(e.code);
   keysDown.add(e.code);
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter'].includes(e.code)) e.preventDefault();
 });
 window.addEventListener('keyup', e=>{ keysDown.delete(e.code); });
 
-const P1_KEYS = {left:'KeyA', right:'KeyD', up:'KeyW', down:'KeyS', shield:'KeyS', attack:'KeyF', grab:'KeyG'};
-const P2_KEYS = {left:'ArrowLeft', right:'ArrowRight', up:'ArrowUp', down:'ArrowDown', shield:'ArrowDown', attack:'Enter', grab:'ShiftRight'};
+// live, mutable — rebinding writes directly into this object, and players
+// hold a reference to their half of it, so a rebind takes effect immediately
+let KEY_BINDINGS = {
+  p1: {left:'KeyA', right:'KeyD', up:'KeyW', down:'KeyS', attack:'KeyF', smash:'KeyR', grab:'KeyG'},
+  p2: {left:'ArrowLeft', right:'ArrowRight', up:'ArrowUp', down:'ArrowDown', attack:'Enter', smash:'Slash', grab:'ShiftRight'},
+};
+const ACTION_LABELS = {left:'← 左', right:'→ 右', up:'↑ ジャンプ', down:'↓ ガード/しゃがみ', attack:'攻撃 (弱/強)', smash:'スマッシュ攻撃', grab:'つかみ'};
+function labelForKey(code){
+  const map = {ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',
+    Space:'Space', Enter:'Enter', ShiftLeft:'L-Shift', ShiftRight:'R-Shift', Slash:'/', Comma:',', Period:'.',
+    Semicolon:';', Quote:"'", ControlLeft:'L-Ctrl', ControlRight:'R-Ctrl', AltLeft:'L-Alt', AltRight:'R-Alt', Backslash:'\\'};
+  if(map[code]) return map[code];
+  if(code.startsWith('Digit')) return code.replace('Digit','');
+  if(code.startsWith('Key')) return code.replace('Key','');
+  return code;
+}
+function buildKeyConfigUI(){
+  ['p1','p2'].forEach(pk=>{
+    const col = document.getElementById(pk+'keyconfig');
+    col.querySelectorAll('.keyRow').forEach(r=>r.remove());
+    Object.keys(ACTION_LABELS).forEach(action=>{
+      const row = document.createElement('div');
+      row.className = 'keyRow';
+      const label = document.createElement('div');
+      label.textContent = ACTION_LABELS[action];
+      const btn = document.createElement('div');
+      btn.className = 'keyBtn';
+      btn.textContent = labelForKey(KEY_BINDINGS[pk][action]);
+      btn.onclick = ()=>{
+        if(awaitingBind){
+          awaitingBind.buttonEl.textContent = labelForKey(KEY_BINDINGS[awaitingBind.player][awaitingBind.action]);
+          awaitingBind.buttonEl.classList.remove('listening');
+        }
+        btn.textContent = '...';
+        btn.classList.add('listening');
+        awaitingBind = {player:pk, action, buttonEl:btn};
+      };
+      row.appendChild(label); row.appendChild(btn);
+      col.appendChild(row);
+    });
+  });
+}
+document.getElementById('openKeyConfigBtn').onclick = ()=>{ show('keyConfigScreen'); buildKeyConfigUI(); };
+document.getElementById('closeKeyConfigBtn').onclick = ()=>{ show('titleScreen'); };
 
 // ---------- GAME STATE ----------
 let gameState = 'TITLE'; // TITLE, SELECT, MATCH, RESULT
@@ -182,31 +324,32 @@ let particles = [];
 let matchTimer = 120*60; // frames, 2 min at 60fps
 let players = [];
 let select = {
-  p1type:'balanced', p2type:'balanced',
+  p1type:'golem', p2type:'kitsune',
   p1color:0, p2color:1,
   p2cpu:false,
 };
 
 // ---------- PLAYER FACTORY ----------
 function createPlayer(id, x, color, type, isCPU, keys){
-  const t = FIGHTER_TYPES[type];
+  const t = CHARACTERS[type];
   return {
-    id, color, type, isCPU, keys,
+    id, color, type, isCPU, keys, charData: t,
     x, y: STAGE.floor.y - t.size, vx:0, vy:0,
     w: t.size, h: t.size*1.6,
-    weight: t.weight, speedCap: t.speed, dashCap: t.dash, jumpPow: t.jump,
+    weight: t.weight, speedCap: t.walkSpeed, dashCap: t.dashSpeed, jumpPow: t.jumpPower,
     facing: id===1 ? 1 : -1,
     damagePercent: 0, stocks: 3,
     state: 'idle', stateTimer: 0,
     onGround: false, standingPlatform: null,
-    jumpsLeft: 2, maxJumps: 2,
+    jumpsLeft: 1+(t.extraJumps||1), maxJumps: 1+(t.extraJumps||1),
     shieldHP: 100, isShielding:false,
     dirHoldFrames: 0, lastDirTapFrame: -999, lastDir: 0, frameCount:0,
     hitstunFrames: 0, invincible: 0,
-    attack: null, // {type, hitboxTimer, activeFrom, activeTo, hit:false, power, angle, hitstun}
+    attack: null, // {key, move, timer, hit}
     grabbing: null, grabbedBy: null,
     downTimer: 0, techWindowUsed:false,
     helpless: false,
+    recoveryUsed: false,
     ledge: false,
     respawnTimer: 0,
     aiTimer: 0, aiState:'approach',
@@ -216,8 +359,8 @@ function createPlayer(id, x, color, type, isCPU, keys){
 function resetMatch(){
   const c1 = COLORS[select.p1color], c2 = COLORS[select.p2color];
   players = [
-    createPlayer(1, 330, c1, select.p1type, false, P1_KEYS),
-    createPlayer(2, 630, c2, select.p2type, select.p2cpu, P2_KEYS),
+    createPlayer(1, 330, c1, select.p1type, false, KEY_BINDINGS.p1),
+    createPlayer(2, 630, c2, select.p2type, select.p2cpu, KEY_BINDINGS.p2),
   ];
   matchTimer = 120*60;
   particles = [];
@@ -244,8 +387,9 @@ function readInput(p, other){
     left: keysDown.has(k.left), right: keysDown.has(k.right),
     up: keysPressed.has(k.up), upHeld: keysDown.has(k.up),
     down: keysDown.has(k.down),
-    shield: keysDown.has(k.shield),
+    shield: keysDown.has(k.down),
     attackPressed: keysPressed.has(k.attack),
+    smashPressed: keysPressed.has(k.smash),
     grabPressed: keysPressed.has(k.grab),
   };
 }
@@ -256,13 +400,13 @@ function aiInput(p, other){
   const dx = other.x - p.x;
   const dist = Math.abs(dx);
   const nearBlast = p.x < STAGE.blast.left+220 || p.x > STAGE.blast.right-220 || p.y < STAGE.blast.top+180;
-  const out = {left:false,right:false,up:false,upHeld:false,down:false,shield:false,attackPressed:false,grabPressed:false};
+  const out = {left:false,right:false,up:false,upHeld:false,down:false,shield:false,attackPressed:false,smashPressed:false,grabPressed:false};
 
   // priority: recover to stage if near blast zone and airborne
   if(nearBlast && !p.onGround){
     const targetX = (STAGE.floor.x + STAGE.floor.w/2);
     if(p.x < targetX) out.right = true; else out.left = true;
-    if(p.y > 150 && (p.jumpsLeft>0 || !p.helpless)) out.up = true;
+    if(p.y > 150){ out.up = true; out.upHeld = true; out.attackPressed = true; }
     return out;
   }
 
@@ -281,8 +425,10 @@ function aiInput(p, other){
     if(other.y < p.y - 40 && p.onGround) out.up = true;
   } else if(p.aiState === 'attack'){
     if(dist < 65){
-      out.attackPressed = Math.random() < 0.5;
-      out.grabPressed = !out.attackPressed && Math.random() < 0.15;
+      const r = Math.random();
+      out.attackPressed = r < 0.4;
+      out.smashPressed = !out.attackPressed && r < 0.55;
+      out.grabPressed = !out.attackPressed && !out.smashPressed && Math.random() < 0.15;
       if(dx>0) out.right = true; else out.left = true;
     } else {
       if(dx>0) out.right = true; else out.left = true;
@@ -296,21 +442,34 @@ function aiInput(p, other){
 }
 
 // ---------- PHYSICS / KNOCKBACK ----------
-function applyKnockback(target, attacker, atk){
-  const kb = ((atk.power * (target.damagePercent + 5)) / target.weight) * 1.15 + atk.baseKnockback;
-  const rad = atk.angle * Math.PI/180;
+function resolveHit(target, attacker, angleDeg, kb, damage){
+  const rad = angleDeg * Math.PI/180;
   const dir = attacker.x < target.x ? 1 : -1;
   target.vx = Math.cos(rad) * kb * dir;
   target.vy = -Math.sin(rad) * kb;
-  target.damagePercent += atk.damage;
+  target.damagePercent += damage;
   target.hitstunFrames = Math.max(6, Math.floor(kb * 1.4));
   setState(target, 'hitstun');
   target.onGround = false;
   target.standingPlatform = null;
 
-  hitstop = Math.min(14, 3 + Math.floor(atk.damage/2));
-  shake = Math.min(10, 2 + atk.damage/3);
+  hitstop = Math.min(14, 3 + Math.floor(damage/2));
+  shake = Math.min(10, 2 + damage/3);
   spawnParticles(target.x, target.y - target.h/2, target.color);
+}
+
+// Used by grab throws (fixed, non-move-table knockback)
+function applyKnockback(target, attacker, atk){
+  const kb = ((atk.power * (target.damagePercent + 5)) / target.weight) * 1.15 + atk.baseKnockback;
+  resolveHit(target, attacker, atk.angle, kb, atk.damage);
+}
+
+// Used by the data-driven move engine: knockback grows with the target's
+// CURRENT damage% (post-hit) scaled by the move's own knockbackScaling,
+// then divided by the target's weight — heavier characters fly less far.
+function applyMoveHit(target, attacker, move){
+  const kb = (move.knockbackBase + (target.damagePercent + move.damage) * move.knockbackScaling) * (100 / target.weight);
+  resolveHit(target, attacker, move.angle || 40, kb, move.damage);
 }
 
 function spawnParticles(x,y,color){
@@ -321,26 +480,33 @@ function spawnParticles(x,y,color){
   }
 }
 
-// ---------- ATTACK DEFINITIONS ----------
-function startAttack(p, isSmash, isAerial){
-  const base = isAerial ? {damage:9, power:7, angle:40, baseKnockback:2, w:46, h:30, startup:4, active:6, total:16}
-                         : isSmash ? {damage:15, power:12, angle:35, baseKnockback:4, w:50, h:26, startup:8, active:6, total:26}
-                         : {damage:6, power:5, angle:45, baseKnockback:2, w:38, h:22, startup:3, active:5, total:14};
-  p.attack = {...base, timer:0, hit:false, isSmash, isAerial};
+// ---------- GENERIC MOVE ENGINE ----------
+// executeMove() is the ONLY place attacks are started. It never contains
+// character-specific logic — it just reads p.charData.moves[moveKey].
+function executeMove(p, moveKey){
+  const move = p.charData.moves[moveKey];
+  if(!move) return;
+  p.attack = { key: moveKey, move, timer: 0, hit: false };
   setState(p, 'attack');
 }
 
 function updateAttackHitbox(p, other){
   if(!p.attack) return;
   const a = p.attack;
+  const move = a.move;
   a.timer++;
-  if(a.timer >= a.startup && a.timer < a.startup+a.active && !a.hit){
-    const hbX = p.x + p.facing * (p.w/2 + a.w/2 - 6);
-    const hbY = p.y - p.h/2;
-    if(rectOverlap(hbX-a.w/2, hbY-a.h/2, a.w, a.h, other.x-other.w/2, other.y-other.h, other.w, other.h) && other.invincible<=0){
+  const activeStart = move.startupFrames;
+  const activeEnd = activeStart + move.activeFrames;
+  const total = activeEnd + move.endLagFrames;
+
+  if(a.timer >= activeStart && a.timer < activeEnd && !a.hit){
+    const hbX = p.x + p.facing * move.hitboxOffset.x;
+    const hbY = p.y + move.hitboxOffset.y;
+    const hw = move.hitboxSize.w, hh = move.hitboxSize.h;
+    if(rectOverlap(hbX-hw/2, hbY-hh/2, hw, hh, other.x-other.w/2, other.y-other.h, other.w, other.h) && other.invincible<=0){
       a.hit = true;
       if(other.isShielding){
-        other.shieldHP -= a.damage*3.4;
+        other.shieldHP -= move.damage*3.4;
         p.vx = -p.facing*2;
         if(other.shieldHP <= 0){
           other.shieldHP = 0;
@@ -348,13 +514,13 @@ function updateAttackHitbox(p, other){
           other.isShielding = false;
           other.hitstunFrames = 180;
         }
-        hitstop = 4; shake=2;
+        hitstop = 4; shake = 2;
       } else {
-        applyKnockback(other, p, a);
+        applyMoveHit(other, p, move);
       }
     }
   }
-  if(a.timer >= a.total){
+  if(a.timer >= total){
     p.attack = null;
     if(p.state === 'attack') setState(p, p.onGround ? 'idle' : 'fall');
   }
@@ -473,6 +639,34 @@ function updatePlayer(p, other, dt){
     }
   }
 
+  // ---- SMASH / ATTACK / UP-B (all data-driven, read from p.charData.moves) ----
+  if(canAct(p) && !p.isShielding && !p.helpless){
+    if(!p.onGround){
+      if(input.upHeld && (input.attackPressed || input.smashPressed) && !p.recoveryUsed){
+        const mv = p.charData.moves.upB;
+        executeMove(p, 'upB');
+        p.vy = -mv.recoveryVy; p.vx = p.facing*mv.recoveryVx;
+        p.helpless = true;
+        p.recoveryUsed = true;
+        spawnParticles(p.x, p.y, p.color);
+      } else if(input.attackPressed || input.smashPressed){
+        executeMove(p, 'nair');
+      }
+    } else {
+      if(input.smashPressed){
+        executeMove(p, 'fsmash');
+      } else if(input.attackPressed){
+        let moveKey;
+        if(input.upHeld) moveKey = 'utilt';
+        else if(input.down) moveKey = 'dtilt';
+        else if(input.left || input.right || p.lastDir !== 0) moveKey = 'ftilt';
+        else moveKey = 'jab';
+        executeMove(p, moveKey);
+      }
+    }
+  }
+  if(p.state === 'attack') updateAttackHitbox(p, other);
+
   // ---- SHIELD ----
   if(input.shield && p.onGround && (canAct(p) || p.state==='shield')){
     setState(p, 'shield');
@@ -494,14 +688,6 @@ function updatePlayer(p, other, dt){
     }
   }
 
-  // ---- UP-SPECIAL (double-tap up while airborne and no jumps, or explicit key combo: up+attack) ----
-  if(!p.onGround && input.attackPressed && input.upHeld && p.jumpsLeft<=0 && !p.helpless && p.state!=='attack'){
-    p.vy = -14; p.vx = p.facing*3;
-    p.helpless = true;
-    setState(p, 'helpless');
-    spawnParticles(p.x,p.y,p.color);
-  }
-
   // ---- DROP THROUGH PLATFORM (hold down on a droppable platform) ----
   if(p.onGround && p.standingPlatform && p.standingPlatform.drop && input.down){
     p.dropHoldFrames = (p.dropHoldFrames||0) + 1;
@@ -514,13 +700,6 @@ function updatePlayer(p, other, dt){
   }
   if(p.dropCooldown > 0) p.dropCooldown--;
 
-  // ---- ATTACK ----
-  if(input.attackPressed && canAct(p) && !p.isShielding && p.state!=='helpless'){
-    const isSmash = (p.frameCount - p.lastDirTapFrame) < 5 && p.lastDir !== 0;
-    startAttack(p, isSmash, !p.onGround);
-  }
-  if(p.state === 'attack') updateAttackHitbox(p, other);
-
   // ---- GRAB ----
   if(input.grabPressed && canAct(p) && p.onGround && !p.isShielding){
     startGrab(p, other);
@@ -530,9 +709,9 @@ function updatePlayer(p, other, dt){
   const edgeL = STAGE.floor.x, edgeR = STAGE.floor.x+STAGE.floor.w;
   if(!p.onGround && p.state!=='ledge' && p.vy>0){
     if(Math.abs(p.x-edgeL)<20 && p.y > STAGE.floor.y-20 && p.y < STAGE.floor.y+30 && p.facing===-1){
-      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeL; p.invincible=40; p.helpless=false; p.jumpsLeft=p.maxJumps;
+      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeL; p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
     } else if(Math.abs(p.x-edgeR)<20 && p.y > STAGE.floor.y-20 && p.y < STAGE.floor.y+30 && p.facing===1){
-      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeR; p.invincible=40; p.helpless=false; p.jumpsLeft=p.maxJumps;
+      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeR; p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
     }
   }
   if(p.state==='ledge'){
@@ -574,6 +753,7 @@ function updatePlayer(p, other, dt){
     p.onGround = true;
     p.jumpsLeft = p.maxJumps;
     p.helpless = false;
+    p.recoveryUsed = false;
     if(p.state==='hitstun' || (wasFalling && p.hitstunFrames>0)){
       p.hitstunFrames = 0;
       setState(p,'down');
@@ -607,6 +787,7 @@ function loseStock(p){
   p.damagePercent = 0;
   p.jumpsLeft = p.maxJumps;
   p.helpless = false;
+  p.recoveryUsed = false;
   p.invincible = 90;
   setState(p, 'fall');
 }
@@ -734,8 +915,8 @@ function drawPlayer(p){
   }
 
   // body (flash white briefly on hit)
-  const flashing = p.attack && p.attack.hit && p.attack.timer < p.attack.startup+p.attack.active+2;
-  CTX.fillStyle = p.color;
+  const flashing = p.attack && p.attack.hit && p.attack.timer < p.attack.move.startupFrames + p.attack.move.activeFrames + 2;
+  CTX.fillStyle = flashing ? '#ffffff' : p.color;
   CTX.strokeStyle = 'rgba(255,255,255,0.6)';
   CTX.lineWidth = 2;
   // legs offset for walk/dash animation
@@ -753,13 +934,14 @@ function drawPlayer(p){
   CTX.arc(p.facing*p.w*0.16, -p.h-8, p.w*0.14, 0, Math.PI*2);
   CTX.fill();
 
-  // attack hitbox visual
+  // attack hitbox visual (reads live from the move's own data)
   if(p.attack){
-    const a=p.attack;
-    if(a.timer>=a.startup && a.timer<a.startup+a.active){
-      CTX.fillStyle = a.isSmash ? 'rgba(255,207,79,0.55)' : 'rgba(255,255,255,0.35)';
-      const hx = p.facing*(p.w/2+a.w/2-6);
-      roundRect(CTX, hx-a.w/2, -p.h/2-a.h/2, a.w, a.h, 8);
+    const a = p.attack, move = a.move;
+    if(a.timer >= move.startupFrames && a.timer < move.startupFrames+move.activeFrames){
+      CTX.fillStyle = a.key==='fsmash' ? 'rgba(255,207,79,0.6)' : a.key==='upB' ? 'rgba(125,255,138,0.5)' : 'rgba(255,255,255,0.35)';
+      const hx = p.facing*move.hitboxOffset.x;
+      const hy = move.hitboxOffset.y;
+      roundRect(CTX, hx-move.hitboxSize.w/2, hy-move.hitboxSize.h/2, move.hitboxSize.w, move.hitboxSize.h, 8);
       CTX.fill();
     }
   }
@@ -785,7 +967,7 @@ function roundRect(ctx,x,y,w,h,r){
 
 // ---------- SCREEN MANAGEMENT ----------
 function show(id){
-  ['titleScreen','selectScreen','resultScreen'].forEach(s=>{
+  ['titleScreen','selectScreen','resultScreen','keyConfigScreen'].forEach(s=>{
     document.getElementById(s).classList.toggle('hidden', s!==id);
   });
   document.getElementById('hud').classList.toggle('hidden', id!=null);
@@ -796,10 +978,10 @@ function buildSelectUI(){
   function buildTypes(containerId, playerKey, cls){
     const el = document.getElementById(containerId);
     el.innerHTML='';
-    Object.keys(FIGHTER_TYPES).forEach(key=>{
+    Object.keys(CHARACTERS).forEach(key=>{
       const chip = document.createElement('div');
       chip.className = 'chip'+(select[playerKey]===key?' active '+cls:'');
-      chip.textContent = FIGHTER_TYPES[key].label;
+      chip.textContent = CHARACTERS[key].label;
       chip.onclick = ()=>{ select[playerKey]=key; buildSelectUI(); };
       el.appendChild(chip);
     });
@@ -819,6 +1001,8 @@ function buildSelectUI(){
   buildTypes('p2types','p2type','p2');
   buildColors('p1colors','p1color');
   buildColors('p2colors','p2color');
+  document.getElementById('p1desc').textContent = CHARACTERS[select.p1type].desc;
+  document.getElementById('p2desc').textContent = CHARACTERS[select.p2type].desc;
   document.getElementById('cpuToggle').textContent = 'CPU: '+(select.p2cpu?'ON':'OFF');
 }
 
@@ -830,7 +1014,7 @@ document.getElementById('rematchBtn').onclick = ()=>{
   gameState='TITLE'; show('titleScreen');
 };
 window.addEventListener('keydown', e=>{
-  if(gameState==='TITLE' && e.code==='Space'){ gameState='SELECT'; show('selectScreen'); buildSelectUI(); }
+  if(gameState==='TITLE' && e.code==='Space' && !awaitingBind && !document.getElementById('titleScreen').classList.contains('hidden')){ gameState='SELECT'; show('selectScreen'); buildSelectUI(); }
 });
 
 // ---------- LOOP ----------
