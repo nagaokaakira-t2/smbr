@@ -116,9 +116,9 @@
     <h1 class="logo">NEON<span>ARENA</span></h1>
     <div class="sub">乱闘フィジックス・ファイター</div>
     <div class="panel">
-      <div><b>操作方法 — PLAYER 1</b>：A/D 移動｜W ジャンプ｜Space ガード｜S しゃがみ/dtilt方向｜F 攻撃｜R スマッシュ｜G つかみ</div>
-      <div><b>操作方法 — PLAYER 2</b>：←/→ 移動｜↑ ジャンプ｜R-Ctrl ガード｜↓ しゃがみ/dtilt方向｜Enter 攻撃｜/ スマッシュ｜Shift つかみ</div>
-      <div>攻撃キー単体＝弱攻撃（jab）｜方向＋攻撃＝強攻撃（ftilt/utilt/dtilt）｜スマッシュキー＝スマッシュ攻撃（fsmash）｜空中で攻撃＝空中攻撃（nair）｜空中で↑＋攻撃 or ↑＋スマッシュ＝上必殺技（upB）</div>
+      <div><b>操作方法 — PLAYER 1</b>：A/D 移動｜W ジャンプ｜E 技の方向(上)｜Shift ダッシュ｜Space ガード｜S しゃがみ/dtilt方向｜F 攻撃｜R スマッシュ｜V 特殊技｜G つかみ</div>
+      <div><b>操作方法 — PLAYER 2</b>：←/→ 移動｜↑ ジャンプ｜' 技の方向(上)｜. ダッシュ｜R-Ctrl ガード｜↓ しゃがみ/dtilt方向｜Enter 攻撃｜/ スマッシュ｜; 特殊技｜Shift つかみ</div>
+      <div>攻撃キー単体＝弱攻撃（jab）｜技の方向(上/下)＋攻撃＝強攻撃（ftilt/utilt/dtilt）｜スマッシュキー＝スマッシュ攻撃（fsmash）｜空中で攻撃＝空中攻撃（nair）｜特殊技キーは方向で変化（無方向=nspecial／横=sspecial／上=uspecial／下=dspecial）し、地上でも空中でも使用可能</div>
       <div>ダメージ%が高いほど吹っ飛びが大きくなる。画面外（バーストライン）に出たら撃墜。</div>
     </div>
     <div class="blink">PRESS SPACE TO START</div>
@@ -189,10 +189,10 @@ const GRAVITY = 0.62, FALL_GRAVITY_MULT = 1.0, MAX_FALL = 13;
 // generically via executeMove() / updateAttackHitbox() — no per-character code.
 // Characters differ not just in numbers but in shape: GOLEM hits slow & huge,
 // KITSUNE is fast & flat for combos, LANCER trades speed for reach, SYLPH
-// gives up ground game for an extra jump and a dominant aerial/upB.
+// gives up ground game for an extra jump and a dominant aerial/uspecial.
 const CHARACTERS = {
   golem: {
-    label: 'GOLEM', desc: '圧倒的な重さと火力。技は遅く隙も大きいが、当たれば大きく吹っ飛ばせる。復帰(upB)は控えめ。',
+    label: 'GOLEM', desc: '圧倒的な重さと火力。技は遅く隙も大きいが、当たれば大きく吹っ飛ばせる。復帰(uspecial)は控えめ。',
     weight: 150, walkSpeed: 2.9, dashSpeed: 4.6, jumpPower: 10.6, size: 42, extraJumps: 1,
     moves: {
       jab:    { damage:7,  knockbackBase:4,  knockbackScaling:0.16, angle:42, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:8,  activeFrames:5, endLagFrames:14 },
@@ -201,7 +201,10 @@ const CHARACTERS = {
       dtilt:  { damage:8,  knockbackBase:5,  knockbackScaling:0.18, angle:8,  hitboxSize:{w:54,h:14}, hitboxOffset:{x:34,y:-6},  startupFrames:9,  activeFrames:5, endLagFrames:18 },
       fsmash: { damage:22, knockbackBase:13, knockbackScaling:0.34, angle:27, hitboxSize:{w:70,h:32}, hitboxOffset:{x:46,y:-30}, startupFrames:20, activeFrames:6, endLagFrames:34 },
       nair:   { damage:12, knockbackBase:6,  knockbackScaling:0.20, angle:48, hitboxSize:{w:56,h:56}, hitboxOffset:{x:0,y:-32},  startupFrames:7,  activeFrames:8, endLagFrames:16 },
-      upB:    { damage:13, knockbackBase:7,  knockbackScaling:0.20, angle:90, hitboxSize:{w:46,h:46}, hitboxOffset:{x:0,y:-44},  startupFrames:6,  activeFrames:8, endLagFrames:12, recoveryVx:1.8, recoveryVy:12.5 },
+      uspecial:    { damage:13, knockbackBase:7,  knockbackScaling:0.20, angle:90, hitboxSize:{w:46,h:46}, hitboxOffset:{x:0,y:-44},  startupFrames:6,  activeFrames:8, endLagFrames:12, recoveryVx:1.8, recoveryVy:12.5 },
+      nspecial: { damage:9,  knockbackBase:5, knockbackScaling:0.20, angle:50,  hitboxSize:{w:44,h:44}, hitboxOffset:{x:0,y:-30},  startupFrames:14, activeFrames:6, endLagFrames:20 },
+      sspecial: { damage:11, knockbackBase:6, knockbackScaling:0.22, angle:20,  hitboxSize:{w:50,h:28}, hitboxOffset:{x:40,y:-26}, startupFrames:10, activeFrames:6, endLagFrames:18, dashBoost:5 },
+      dspecial: { damage:10, knockbackBase:6, knockbackScaling:0.22, angle:-70, hitboxSize:{w:46,h:20}, hitboxOffset:{x:26,y:-6},  startupFrames:9,  activeFrames:5, endLagFrames:16 },
     }
   },
   kitsune: {
@@ -214,7 +217,10 @@ const CHARACTERS = {
       dtilt:  { damage:4, knockbackBase:2,   knockbackScaling:0.12, angle:14, hitboxSize:{w:32,h:10}, hitboxOffset:{x:22,y:-6},  startupFrames:3, activeFrames:4,  endLagFrames:8 },
       fsmash: { damage:11,knockbackBase:5.5, knockbackScaling:0.24, angle:32, hitboxSize:{w:42,h:18}, hitboxOffset:{x:30,y:-20}, startupFrames:9, activeFrames:5,  endLagFrames:17 },
       nair:   { damage:7, knockbackBase:3,   knockbackScaling:0.13, angle:40, hitboxSize:{w:38,h:38}, hitboxOffset:{x:0,y:-20},  startupFrames:3, activeFrames:10, endLagFrames:8 },
-      upB:    { damage:6, knockbackBase:3.2, knockbackScaling:0.13, angle:70, hitboxSize:{w:28,h:28}, hitboxOffset:{x:0,y:-28},  startupFrames:3, activeFrames:6,  endLagFrames:6, recoveryVx:4.6, recoveryVy:16 },
+      uspecial:    { damage:6, knockbackBase:3.2, knockbackScaling:0.13, angle:70, hitboxSize:{w:28,h:28}, hitboxOffset:{x:0,y:-28},  startupFrames:3, activeFrames:6,  endLagFrames:6, recoveryVx:4.6, recoveryVy:16 },
+      nspecial: { damage:5, knockbackBase:2.4, knockbackScaling:0.13, angle:45,  hitboxSize:{w:30,h:30}, hitboxOffset:{x:0,y:-24},  startupFrames:5, activeFrames:5, endLagFrames:9 },
+      sspecial: { damage:6, knockbackBase:2.6, knockbackScaling:0.14, angle:18,  hitboxSize:{w:36,h:16}, hitboxOffset:{x:30,y:-20}, startupFrames:4, activeFrames:5, endLagFrames:9, dashBoost:7 },
+      dspecial: { damage:5, knockbackBase:2.4, knockbackScaling:0.13, angle:-60, hitboxSize:{w:32,h:14}, hitboxOffset:{x:20,y:-4},  startupFrames:4, activeFrames:4, endLagFrames:8 },
     }
   },
   lancer: {
@@ -227,7 +233,10 @@ const CHARACTERS = {
       dtilt:  { damage:6, knockbackBase:3.5, knockbackScaling:0.14, angle:10, hitboxSize:{w:66,h:12}, hitboxOffset:{x:50,y:-6},  startupFrames:7, activeFrames:5, endLagFrames:15 },
       fsmash: { damage:17,knockbackBase:9,   knockbackScaling:0.28, angle:24, hitboxSize:{w:86,h:20}, hitboxOffset:{x:62,y:-24}, startupFrames:19,activeFrames:6, endLagFrames:32 },
       nair:   { damage:9, knockbackBase:4.5, knockbackScaling:0.16, angle:44, hitboxSize:{w:60,h:40}, hitboxOffset:{x:20,y:-26}, startupFrames:6, activeFrames:7, endLagFrames:14 },
-      upB:    { damage:9, knockbackBase:5,   knockbackScaling:0.16, angle:75, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34},  startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:3, recoveryVy:14 },
+      uspecial:    { damage:9, knockbackBase:5,   knockbackScaling:0.16, angle:75, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34},  startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:3, recoveryVy:14 },
+      nspecial: { damage:8, knockbackBase:4,   knockbackScaling:0.17, angle:22,  hitboxSize:{w:76,h:14}, hitboxOffset:{x:58,y:-24}, startupFrames:13, activeFrames:5, endLagFrames:20 },
+      sspecial: { damage:9, knockbackBase:4.5, knockbackScaling:0.18, angle:18,  hitboxSize:{w:60,h:18}, hitboxOffset:{x:44,y:-24}, startupFrames:9,  activeFrames:5, endLagFrames:16, dashBoost:6 },
+      dspecial: { damage:7, knockbackBase:4,   knockbackScaling:0.15, angle:-65, hitboxSize:{w:50,h:16}, hitboxOffset:{x:34,y:-6},  startupFrames:8,  activeFrames:5, endLagFrames:15 },
     }
   },
   sylph: {
@@ -240,7 +249,10 @@ const CHARACTERS = {
       dtilt:  { damage:4, knockbackBase:1.8, knockbackScaling:0.11, angle:14, hitboxSize:{w:30,h:10}, hitboxOffset:{x:20,y:-6},  startupFrames:4,  activeFrames:4,  endLagFrames:9 },
       fsmash: { damage:12,knockbackBase:5,   knockbackScaling:0.22, angle:30, hitboxSize:{w:40,h:18}, hitboxOffset:{x:28,y:-20}, startupFrames:10, activeFrames:5,  endLagFrames:18 },
       nair:   { damage:13,knockbackBase:6.5, knockbackScaling:0.22, angle:50, hitboxSize:{w:58,h:58}, hitboxOffset:{x:0,y:-30},  startupFrames:5,  activeFrames:12, endLagFrames:12 },
-      upB:    { damage:7, knockbackBase:3.5, knockbackScaling:0.14, angle:85, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-34},  startupFrames:4,  activeFrames:10, endLagFrames:8, recoveryVx:5.4, recoveryVy:18 },
+      uspecial:    { damage:7, knockbackBase:3.5, knockbackScaling:0.14, angle:85, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-34},  startupFrames:4,  activeFrames:10, endLagFrames:8, recoveryVx:5.4, recoveryVy:18 },
+      nspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:50,  hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-26},  startupFrames:8, activeFrames:6, endLagFrames:12 },
+      sspecial: { damage:6, knockbackBase:2.6, knockbackScaling:0.13, angle:24,  hitboxSize:{w:36,h:20}, hitboxOffset:{x:26,y:-22}, startupFrames:6, activeFrames:5, endLagFrames:10, dashBoost:6 },
+      dspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:-70, hitboxSize:{w:38,h:16}, hitboxOffset:{x:20,y:-4},  startupFrames:6, activeFrames:5, endLagFrames:10 },
     }
   },
   volt: {
@@ -257,7 +269,13 @@ const CHARACTERS = {
       fsmash: { damage:16, knockbackBase:8,  knockbackScaling:0.30, angle:26, hitboxSize:{w:30,h:20}, hitboxOffset:{x:40,y:-26}, startupFrames:22, activeFrames:1, endLagFrames:30,
                 projectile:true, projectileSpeed:6, projectileLife:90, projectileSize:{w:30,h:20} },
       nair:   { damage:7, knockbackBase:3.5, knockbackScaling:0.15, angle:42, hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-24},  startupFrames:6,  activeFrames:6, endLagFrames:14 },
-      upB:    { damage:8, knockbackBase:4,   knockbackScaling:0.15, angle:80, hitboxSize:{w:32,h:32}, hitboxOffset:{x:0,y:-32},  startupFrames:5,  activeFrames:7, endLagFrames:9, recoveryVx:3.2, recoveryVy:14.5 },
+      uspecial:    { damage:8, knockbackBase:4,   knockbackScaling:0.15, angle:80, hitboxSize:{w:32,h:32}, hitboxOffset:{x:0,y:-32},  startupFrames:5,  activeFrames:7, endLagFrames:9, recoveryVx:3.2, recoveryVy:14.5 },
+      // specials stay in-theme: nspecial/dspecial are more projectiles, sspecial is a melee gap-closer
+      nspecial: { damage:5, knockbackBase:2.5, knockbackScaling:0.14, angle:20, hitboxSize:{w:14,h:8}, hitboxOffset:{x:28,y:-22}, startupFrames:7, activeFrames:1, endLagFrames:14,
+                  projectile:true, projectileSpeed:11, projectileLife:50, projectileSize:{w:14,h:8} },
+      sspecial: { damage:8, knockbackBase:4,   knockbackScaling:0.17, angle:20, hitboxSize:{w:38,h:18}, hitboxOffset:{x:28,y:-22}, startupFrames:9,  activeFrames:5, endLagFrames:16, dashBoost:6 },
+      dspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.15, angle:8,  hitboxSize:{w:20,h:10}, hitboxOffset:{x:24,y:-2},  startupFrames:12, activeFrames:1, endLagFrames:20,
+                  projectile:true, projectileSpeed:6, projectileLife:80, projectileSize:{w:20,h:10} },
     }
   },
   shinobi: {
@@ -270,7 +288,10 @@ const CHARACTERS = {
       dtilt:  { damage:5, knockbackBase:1.5, knockbackScaling:0.07, angle:12, hitboxSize:{w:32,h:10}, hitboxOffset:{x:22,y:-6},  startupFrames:4, activeFrames:4, endLagFrames:8 },
       fsmash: { damage:18, knockbackBase:10, knockbackScaling:0.30, angle:30, hitboxSize:{w:50,h:20}, hitboxOffset:{x:34,y:-22}, startupFrames:12, activeFrames:5, endLagFrames:22 },
       nair:   { damage:8, knockbackBase:3.5, knockbackScaling:0.15, angle:45, hitboxSize:{w:44,h:44}, hitboxOffset:{x:0,y:-24},  startupFrames:5, activeFrames:8, endLagFrames:11 },
-      upB:    { damage:7, knockbackBase:3.5, knockbackScaling:0.15, angle:75, hitboxSize:{w:30,h:30}, hitboxOffset:{x:0,y:-30},  startupFrames:4, activeFrames:7, endLagFrames:8, recoveryVx:3.4, recoveryVy:14 },
+      uspecial:    { damage:7, knockbackBase:3.5, knockbackScaling:0.15, angle:75, hitboxSize:{w:30,h:30}, hitboxOffset:{x:0,y:-30},  startupFrames:4, activeFrames:7, endLagFrames:8, recoveryVx:3.4, recoveryVy:14 },
+      nspecial: { damage:5, knockbackBase:1.8, knockbackScaling:0.09, angle:35,  hitboxSize:{w:32,h:28}, hitboxOffset:{x:0,y:-22},  startupFrames:6, activeFrames:5, endLagFrames:10 },
+      sspecial: { damage:6, knockbackBase:2,   knockbackScaling:0.10, angle:20,  hitboxSize:{w:34,h:16}, hitboxOffset:{x:26,y:-20}, startupFrames:5, activeFrames:5, endLagFrames:9, dashBoost:8 },
+      dspecial: { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:-70, hitboxSize:{w:34,h:14}, hitboxOffset:{x:20,y:-4},  startupFrames:6, activeFrames:5, endLagFrames:11 },
     }
   }
 };
@@ -304,10 +325,10 @@ window.addEventListener('keyup', e=>{ keysDown.delete(e.code); });
 // live, mutable — rebinding writes directly into this object, and players
 // hold a reference to their half of it, so a rebind takes effect immediately
 let KEY_BINDINGS = {
-  p1: {left:'KeyA', right:'KeyD', up:'KeyW', down:'KeyS', shield:'Space', attack:'KeyF', smash:'KeyR', grab:'KeyG'},
-  p2: {left:'ArrowLeft', right:'ArrowRight', up:'ArrowUp', down:'ArrowDown', shield:'ControlRight', attack:'Enter', smash:'Slash', grab:'ShiftRight'},
+  p1: {left:'KeyA', right:'KeyD', up:'KeyW', down:'KeyS', aimUp:'KeyE', dash:'ShiftLeft', shield:'Space', attack:'KeyF', smash:'KeyR', special:'KeyV', grab:'KeyG'},
+  p2: {left:'ArrowLeft', right:'ArrowRight', up:'ArrowUp', down:'ArrowDown', aimUp:'Quote', dash:'Period', shield:'ControlRight', attack:'Enter', smash:'Slash', special:'Semicolon', grab:'ShiftRight'},
 };
-const ACTION_LABELS = {left:'← 左', right:'→ 右', up:'↑ ジャンプ', down:'↓ しゃがみ/dtilt', shield:'ガード(シールド)', attack:'攻撃 (弱/強)', smash:'スマッシュ攻撃', grab:'つかみ'};
+const ACTION_LABELS = {left:'← 左', right:'→ 右', up:'↑ ジャンプ', down:'↓ しゃがみ/dtilt方向', aimUp:'↑ 技の方向(上)', dash:'ダッシュ', shield:'ガード(シールド)', attack:'攻撃 (弱/強)', smash:'スマッシュ攻撃', special:'特殊技(方向で変化)', grab:'つかみ'};
 function labelForKey(code){
   const map = {ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',
     Space:'Space', Enter:'Enter', ShiftLeft:'L-Shift', ShiftRight:'R-Shift', Slash:'/', Comma:',', Period:'.',
@@ -419,9 +440,12 @@ function readInput(p, other){
     left: keysDown.has(k.left), right: keysDown.has(k.right),
     up: keysPressed.has(k.up), upHeld: keysDown.has(k.up),
     down: keysDown.has(k.down),
+    aimUp: keysDown.has(k.aimUp),
+    dashHeld: keysDown.has(k.dash),
     shield: keysDown.has(k.shield),
     attackPressed: keysPressed.has(k.attack),
     smashPressed: keysPressed.has(k.smash),
+    specialPressed: keysPressed.has(k.special),
     grabPressed: keysPressed.has(k.grab),
   };
 }
@@ -432,13 +456,13 @@ function aiInput(p, other){
   const dx = other.x - p.x;
   const dist = Math.abs(dx);
   const nearBlast = p.x < STAGE.blast.left+220 || p.x > STAGE.blast.right-220 || p.y < STAGE.blast.top+180;
-  const out = {left:false,right:false,up:false,upHeld:false,down:false,shield:false,attackPressed:false,smashPressed:false,grabPressed:false};
+  const out = {left:false,right:false,up:false,upHeld:false,down:false,aimUp:false,dashHeld:false,shield:false,attackPressed:false,smashPressed:false,specialPressed:false,grabPressed:false};
 
   // priority: recover to stage if near blast zone and airborne
   if(nearBlast && !p.onGround){
     const targetX = (STAGE.floor.x + STAGE.floor.w/2);
     if(p.x < targetX) out.right = true; else out.left = true;
-    if(p.y > 150){ out.up = true; out.upHeld = true; out.attackPressed = true; }
+    if(p.y > 150){ out.up = true; out.aimUp = true; out.specialPressed = true; }
     return out;
   }
 
@@ -452,15 +476,16 @@ function aiInput(p, other){
   }
 
   if(p.aiState === 'approach'){
-    if(dx > 12) out.right = true;
-    else if(dx < -12) out.left = true;
+    if(dx > 12){ out.right = true; out.dashHeld = true; }
+    else if(dx < -12){ out.left = true; out.dashHeld = true; }
     if(other.y < p.y - 40 && p.onGround) out.up = true;
   } else if(p.aiState === 'attack'){
     if(dist < 65){
       const r = Math.random();
-      out.attackPressed = r < 0.4;
-      out.smashPressed = !out.attackPressed && r < 0.55;
-      out.grabPressed = !out.attackPressed && !out.smashPressed && Math.random() < 0.15;
+      out.attackPressed = r < 0.35;
+      out.smashPressed = !out.attackPressed && r < 0.5;
+      out.specialPressed = !out.attackPressed && !out.smashPressed && r < 0.65;
+      out.grabPressed = !out.attackPressed && !out.smashPressed && !out.specialPressed && Math.random() < 0.2;
       if(dx>0) out.right = true; else out.left = true;
     } else {
       if(dx>0) out.right = true; else out.left = true;
@@ -693,13 +718,17 @@ function updatePlayer(p, other, dt){
       p.facing = dir;
       const tapGap = p.frameCount - p.lastDirTapFrame;
       if(dir !== p.lastDir){
-        // fresh direction press: check for dash-worthy quick re-tap
-        if(dir === p.prevReleasedDir && tapGap < 12 && p.onGround){
+        // fresh direction press: dash if the dedicated dash key is held, or on a quick re-tap
+        if(input.dashHeld && p.onGround){
+          setState(p, 'dash');
+        } else if(dir === p.prevReleasedDir && tapGap < 12 && p.onGround){
           setState(p, 'dash');
         } else if(p.onGround && p.state !== 'dash'){
           setState(p, 'walk');
         }
         p.lastDirTapFrame = p.frameCount;
+      } else if(input.dashHeld && p.onGround && p.state !== 'dash' && p.state !== 'attack'){
+        setState(p, 'dash');
       }
       p.lastDir = dir;
       const cap = p.state === 'dash' ? p.dashCap : p.speedCap;
@@ -714,30 +743,50 @@ function updatePlayer(p, other, dt){
     }
   }
 
-  // ---- SMASH / ATTACK / UP-B (all data-driven, read from p.charData.moves) ----
+  // ---- SPECIAL / SMASH / ATTACK (all data-driven, read from p.charData.moves) ----
+  // Specials (special key) work identically grounded or airborne, and pick a
+  // move by held direction: aimUp->uspecial, down->dspecial, side->sspecial, none->nspecial.
+  // Normal attacks (attack key) still pick jab/ftilt/utilt/dtilt on the ground, nair in the air.
+  // Smash (smash key) is grounded-only, always fsmash.
   if(canAct(p) && !p.isShielding && !p.helpless){
-    if(!p.onGround){
-      if(input.upHeld && (input.attackPressed || input.smashPressed) && !p.recoveryUsed){
-        const mv = p.charData.moves.upB;
-        executeMove(p, 'upB');
-        p.vy = -mv.recoveryVy; p.vx = p.facing*mv.recoveryVx;
-        p.helpless = true;
-        p.recoveryUsed = true;
-        spawnParticles(p.x, p.y, p.color);
-      } else if(input.attackPressed || input.smashPressed){
-        executeMove(p, 'nair');
+    if(input.specialPressed){
+      let sKey = null;
+      if(input.aimUp){
+        if(!p.recoveryUsed) sKey = 'uspecial';
+      } else if(input.down){
+        sKey = 'dspecial';
+      } else if(input.left || input.right || p.lastDir !== 0){
+        sKey = 'sspecial';
+      } else {
+        sKey = 'nspecial';
       }
-    } else {
-      if(input.smashPressed){
-        executeMove(p, 'fsmash');
-      } else if(input.attackPressed){
+      if(sKey){
+        executeMove(p, sKey);
+        const mv = p.charData.moves[sKey];
+        if(sKey === 'sspecial' && mv.dashBoost){
+          p.vx = p.facing*mv.dashBoost;
+        }
+        if(sKey === 'uspecial'){
+          p.vy = -(mv.recoveryVy||0);
+          p.vx = p.facing*(mv.recoveryVx||0);
+          p.onGround = false; p.standingPlatform = null;
+          p.helpless = true; p.recoveryUsed = true;
+          spawnParticles(p.x, p.y, p.color);
+        }
+      }
+    } else if(input.attackPressed){
+      if(!p.onGround){
+        executeMove(p, 'nair');
+      } else {
         let moveKey;
-        if(input.upHeld) moveKey = 'utilt';
+        if(input.aimUp) moveKey = 'utilt';
         else if(input.down) moveKey = 'dtilt';
         else if(input.left || input.right || p.lastDir !== 0) moveKey = 'ftilt';
         else moveKey = 'jab';
         executeMove(p, moveKey);
       }
+    } else if(input.smashPressed && p.onGround){
+      executeMove(p, 'fsmash');
     }
   }
   if(p.state === 'attack') updateAttackHitbox(p, other);
@@ -1031,7 +1080,8 @@ function drawPlayer(p){
         CTX.fill();
       }
     } else if(a.timer >= move.startupFrames && a.timer < move.startupFrames+move.activeFrames){
-      CTX.fillStyle = a.key==='fsmash' ? 'rgba(255,207,79,0.6)' : a.key==='upB' ? 'rgba(125,255,138,0.5)' : 'rgba(255,255,255,0.35)';
+      const isSpecial = a.key==='uspecial'||a.key==='nspecial'||a.key==='sspecial'||a.key==='dspecial';
+      CTX.fillStyle = a.key==='fsmash' ? 'rgba(255,207,79,0.6)' : isSpecial ? 'rgba(125,255,138,0.5)' : 'rgba(255,255,255,0.35)';
       const hx = p.facing*move.hitboxOffset.x;
       const hy = move.hitboxOffset.y;
       roundRect(CTX, hx-move.hitboxSize.w/2, hy-move.hitboxSize.h/2, move.hitboxSize.w, move.hitboxSize.h, 8);
