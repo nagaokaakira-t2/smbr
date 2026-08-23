@@ -296,9 +296,27 @@ const CHARACTERS = {
       sspecial: { damage:6, knockbackBase:2,   knockbackScaling:0.10, angle:20,  hitboxSize:{w:34,h:16}, hitboxOffset:{x:26,y:-20}, startupFrames:5, activeFrames:5, endLagFrames:9, dashBoost:8 },
       dspecial: { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:-70, hitboxSize:{w:34,h:14}, hitboxOffset:{x:20,y:-4},  startupFrames:6, activeFrames:5, endLagFrames:11 },
     }
+  },
+  ronin: {
+    label: 'RONIN', desc: '高威力の万能格闘家。ダメージ100%を超えると全ての技の吹っ飛びが上昇する「怒り」状態に。しゃがみ→前入力から特殊技を出すとコマンド技（強化技）が発動する。',
+    weight: 108, walkSpeed: 3.7, dashSpeed: 5.8, jumpPower: 11.2, size: 36, extraJumps: 1, hasRage: true,
+    moves: {
+      jab:    { damage:6,  knockbackBase:3,   knockbackScaling:0.15, angle:38,  hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
+      ftilt:  { damage:8,  knockbackBase:4,   knockbackScaling:0.18, angle:26,  hitboxSize:{w:44,h:18}, hitboxOffset:{x:32,y:-22}, startupFrames:7,  activeFrames:5, endLagFrames:14 },
+      utilt:  { damage:7,  knockbackBase:4,   knockbackScaling:0.17, angle:82,  hitboxSize:{w:30,h:40}, hitboxOffset:{x:12,y:-50}, startupFrames:7,  activeFrames:5, endLagFrames:13 },
+      dtilt:  { damage:7,  knockbackBase:3.5, knockbackScaling:0.15, angle:10,  hitboxSize:{w:40,h:14}, hitboxOffset:{x:28,y:-6},  startupFrames:6,  activeFrames:5, endLagFrames:13 },
+      fsmash: { damage:20, knockbackBase:12,  knockbackScaling:0.32, angle:28,  hitboxSize:{w:56,h:26}, hitboxOffset:{x:40,y:-26}, startupFrames:15, activeFrames:6, endLagFrames:26 },
+      nair:   { damage:10, knockbackBase:5,   knockbackScaling:0.18, angle:46,  hitboxSize:{w:48,h:48}, hitboxOffset:{x:0,y:-28},  startupFrames:6,  activeFrames:7, endLagFrames:14 },
+      uspecial:    { damage:10, knockbackBase:6, knockbackScaling:0.18, angle:85, hitboxSize:{w:38,h:38}, hitboxOffset:{x:0,y:-38}, startupFrames:5, activeFrames:7, endLagFrames:10, recoveryVx:2.4, recoveryVy:13 },
+      nspecial: { damage:9,  knockbackBase:5,   knockbackScaling:0.19, angle:40,  hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-26},  startupFrames:10, activeFrames:5, endLagFrames:16 },
+      sspecial: { damage:10, knockbackBase:5.5, knockbackScaling:0.20, angle:22,  hitboxSize:{w:42,h:20}, hitboxOffset:{x:32,y:-24}, startupFrames:8,  activeFrames:5, endLagFrames:15, dashBoost:6 },
+      dspecial: { damage:9,  knockbackBase:5,   knockbackScaling:0.19, angle:-65, hitboxSize:{w:40,h:18}, hitboxOffset:{x:26,y:-6},  startupFrames:8,  activeFrames:5, endLagFrames:15 },
+      // bonus signature move: only comes out via the down->forward->special motion input
+      command:  { damage:16, knockbackBase:9,  knockbackScaling:0.28, angle:24, hitboxSize:{w:50,h:24}, hitboxOffset:{x:40,y:-24}, startupFrames:9, activeFrames:6, endLagFrames:20 },
+    }
   }
 };
-const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f'];
+const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f','#ff5566'];
 
 
 // ---------- INPUT ----------
@@ -408,6 +426,8 @@ function createPlayer(id, x, color, type, isCPU, keys){
     ledge: false,
     respawnTimer: 0,
     aiTimer: 0, aiState:'approach',
+    motionDownFrames: 0, motionForwardWindow: 0,
+    armMode: 0,
   };
 }
 
@@ -528,7 +548,11 @@ function applyKnockback(target, attacker, atk){
 // CURRENT damage% (post-hit) scaled by the move's own knockbackScaling,
 // then divided by the target's weight — heavier characters fly less far.
 function applyMoveHit(target, attacker, move){
-  const kb = (move.knockbackBase + (target.damagePercent + move.damage) * move.knockbackScaling) * (100 / target.weight);
+  let kb = (move.knockbackBase + (target.damagePercent + move.damage) * move.knockbackScaling) * (100 / target.weight);
+  // "Rage": characters flagged hasRage hit harder once their own damage crosses 100%
+  if(attacker.charData.hasRage && attacker.damagePercent >= 100){
+    kb *= 1.25;
+  }
   resolveHit(target, attacker, move.angle || 40, kb, move.damage);
 }
 
@@ -541,10 +565,12 @@ function spawnParticles(x,y,color){
 }
 
 // ---------- GENERIC MOVE ENGINE ----------
-// executeMove() is the ONLY place attacks are started. It never contains
-// character-specific logic — it just reads p.charData.moves[moveKey].
-function executeMove(p, moveKey){
-  const move = p.charData.moves[moveKey];
+// executeMove() is the ONLY place attacks are started. It reads
+// p.charData.moves[moveKey] — unless an overrideMove is passed, which lets a
+// character swap what a given move key actually does at runtime (e.g. a
+// neutral special whose stats depend on a currently-selected weapon mode).
+function executeMove(p, moveKey, overrideMove){
+  const move = overrideMove || p.charData.moves[moveKey];
   if(!move) return;
   p.attack = { key: moveKey, move, timer: 0, hit: false };
   setState(p, 'attack');
@@ -711,6 +737,16 @@ function updatePlayer(p, other, dt){
     }
   }
 
+  // ---- MOTION INPUT TRACKING (down -> forward -> special = command move) ----
+  // Generic: works for any character whose data defines a `command` move.
+  if(input.down){ p.motionDownFrames = 14; }
+  else if(p.motionDownFrames > 0){ p.motionDownFrames--; }
+  if(p.motionDownFrames > 0 && ((p.facing===1 && input.right) || (p.facing===-1 && input.left))){
+    p.motionForwardWindow = 16;
+  } else if(p.motionForwardWindow > 0){
+    p.motionForwardWindow--;
+  }
+
   // ---- MOVEMENT input (only in movement-eligible states) ----
   if(canMove(p) && p.state!=='attack'){
     let dir = 0;
@@ -754,7 +790,11 @@ function updatePlayer(p, other, dt){
   if(canAct(p) && !p.isShielding && !p.helpless){
     if(input.specialPressed){
       let sKey = null;
-      if(input.aimUp){
+      const forwardHeld = (p.facing===1 && input.right) || (p.facing===-1 && input.left);
+      if(p.charData.moves.command && p.motionForwardWindow > 0 && forwardHeld){
+        sKey = 'command';
+        p.motionForwardWindow = 0; p.motionDownFrames = 0;
+      } else if(input.aimUp){
         if(!p.recoveryUsed) sKey = 'uspecial';
       } else if(input.down){
         sKey = 'dspecial';
@@ -764,8 +804,14 @@ function updatePlayer(p, other, dt){
         sKey = 'nspecial';
       }
       if(sKey){
-        executeMove(p, sKey);
-        const mv = p.charData.moves[sKey];
+        // arm-mode weapon swap: nspecial's actual stats come from the
+        // character's currently-selected weapon mode instead of a fixed move
+        const modeMove = (sKey === 'nspecial' && p.charData.armModes) ? p.charData.armModes[p.armMode||0] : null;
+        executeMove(p, sKey, modeMove);
+        const mv = modeMove || p.charData.moves[sKey];
+        if(sKey === 'dspecial' && p.charData.armModes){
+          p.armMode = ((p.armMode||0)+1) % p.charData.armModes.length;
+        }
         if(sKey === 'sspecial' && mv.dashBoost){
           p.vx = p.facing*mv.dashBoost;
         }
@@ -1042,6 +1088,16 @@ function drawPlayer(p){
   if(p.state==='shieldbreak') CTX.globalAlpha = 0.6;
 
   CTX.translate(p.x, p.y);
+  // rage aura (hasRage characters past 100% damage)
+  if(p.charData.hasRage && p.damagePercent >= 100){
+    CTX.save();
+    CTX.globalAlpha = 0.35 + Math.sin(p.frameCount*0.3)*0.1;
+    CTX.strokeStyle = '#ff5566'; CTX.lineWidth = 3;
+    CTX.beginPath();
+    CTX.ellipse(0, -p.h/2, p.w/2+10, p.h/2+10, 0, 0, Math.PI*2);
+    CTX.stroke();
+    CTX.restore();
+  }
   // shield bubble
   if(p.isShielding){
     CTX.beginPath();
@@ -1084,7 +1140,7 @@ function drawPlayer(p){
       }
     } else if(a.timer >= move.startupFrames && a.timer < move.startupFrames+move.activeFrames){
       const isSpecial = a.key==='uspecial'||a.key==='nspecial'||a.key==='sspecial'||a.key==='dspecial';
-      CTX.fillStyle = a.key==='fsmash' ? 'rgba(255,207,79,0.6)' : isSpecial ? 'rgba(125,255,138,0.5)' : 'rgba(255,255,255,0.35)';
+      CTX.fillStyle = a.key==='command' ? 'rgba(255,85,102,0.65)' : a.key==='fsmash' ? 'rgba(255,207,79,0.6)' : isSpecial ? 'rgba(125,255,138,0.5)' : 'rgba(255,255,255,0.35)';
       const hx = p.facing*move.hitboxOffset.x;
       const hy = move.hitboxOffset.y;
       roundRect(CTX, hx-move.hitboxSize.w/2, hy-move.hitboxSize.h/2, move.hitboxSize.w, move.hitboxSize.h, 8);
