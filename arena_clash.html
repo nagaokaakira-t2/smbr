@@ -57,6 +57,8 @@
     border:1px solid var(--grid); padding:16px; border-radius:4px; background:rgba(16,21,42,0.5); width:250px;
   }
   .charDesc{ font-size:10px; color:var(--dim); line-height:1.7; text-align:left; min-height:56px; }
+  .portrait{ width:150px; }
+  .portrait svg{ width:100%; height:auto; border-radius:6px; display:block; }
   .fighterCol h3{ font-family:'Orbitron',sans-serif; font-size:14px; letter-spacing:2px; margin:0; }
   .chips{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
   .chip{
@@ -147,16 +149,19 @@
     <div class="selectRow">
       <div class="fighterCol">
         <h3 style="color:var(--cyan)">PLAYER 1</h3>
+        <div class="portrait" id="p1portrait"></div>
         <div class="chips" id="p1types"></div>
         <div class="charDesc" id="p1desc"></div>
         <div class="swatches" id="p1colors"></div>
       </div>
       <div class="fighterCol">
         <h3 style="color:var(--magenta)">PLAYER 2</h3>
+        <div class="portrait" id="p2portrait"></div>
         <div class="chips" id="p2types"></div>
         <div class="charDesc" id="p2desc"></div>
         <div class="swatches" id="p2colors"></div>
         <div class="chips"><div class="chip" id="cpuToggle">CPU: OFF</div></div>
+        <div class="chips" id="cpuLevelChips"></div>
       </div>
     </div>
     <button class="big" id="startMatchBtn">FIGHT!</button>
@@ -317,7 +322,7 @@ const CHARACTERS = {
   },
   cobra: {
     label: 'COBRA', desc: '伸びる左右の腕による飛び道具攻撃(nspecial/sspecial)とキック主体の近接技を使い分ける万能型。下必殺技で右腕の武器を3種類（曲線軌道/重量弾/標準ビーム）に切り替えられる。',
-    weight: 88, walkSpeed: 4.0, dashSpeed: 6.2, jumpPower: 12.0, size: 33, extraJumps: 1,
+    weight: 88, walkSpeed: 4.0, dashSpeed: 6.2, jumpPower: 12.0, size: 33, extraJumps: 1, cycleMode: 'dspecial',
     moves: {
       jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4,  activeFrames:3, endLagFrames:8 },
       ftilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:40,h:18}, hitboxOffset:{x:30,y:-22}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
@@ -332,7 +337,7 @@ const CHARACTERS = {
       dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.08, angle:30, hitboxSize:{w:24,h:24}, hitboxOffset:{x:0,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:10 },
     },
     // the three right-arm weapon modes nspecial cycles through via dspecial
-    armModes: [
+    nspecialModes: [
       { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:70,h:22}, hitboxOffset:{x:50,y:-24}, startupFrames:10, activeFrames:3, endLagFrames:16,
         projectile:true, projectileSpeed:7,  projectileLife:55, projectileSize:{w:24,h:22} },
       { damage:14, knockbackBase:8,   knockbackScaling:0.26, angle:26, hitboxSize:{w:34,h:30}, hitboxOffset:{x:30,y:-24}, startupFrames:16, activeFrames:3, endLagFrames:24,
@@ -357,9 +362,550 @@ const CHARACTERS = {
       sspecial: { damage:10, knockbackBase:6,  knockbackScaling:0.22, angle:18, hitboxSize:{w:46,h:24}, hitboxOffset:{x:34,y:-24}, startupFrames:10, activeFrames:6, endLagFrames:18, dashBoost:8 },
       dspecial: { damage:13, knockbackBase:7,  knockbackScaling:0.26, angle:35, hitboxSize:{w:44,h:44}, hitboxOffset:{x:0,y:-22},  startupFrames:18, activeFrames:4, endLagFrames:26 },
     }
+  },
+  astra: {
+    label: 'ASTRA', desc: '必殺ワザは使うたびに炎・氷・雷の3属性が自動で切り替わる魔法剣士型。下必殺技はカウンター技で、背後からの攻撃も受け止めて反撃できる。',
+    weight: 82, walkSpeed: 4.3, dashSpeed: 6.5, jumpPower: 12.4, size: 32, extraJumps: 1, cycleMode: 'cast',
+    moves: {
+      jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.13, angle:36, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:4,  activeFrames:3, endLagFrames:7 },
+      ftilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.17, angle:26, hitboxSize:{w:40,h:18}, hitboxOffset:{x:30,y:-22}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
+      utilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:85, hitboxSize:{w:30,h:38}, hitboxOffset:{x:12,y:-48}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
+      dtilt:  { damage:6, knockbackBase:2.8, knockbackScaling:0.13, angle:18, hitboxSize:{w:40,h:14}, hitboxOffset:{x:28,y:-6},  startupFrames:5,  activeFrames:4, endLagFrames:11 },
+      fsmash: { damage:18,knockbackBase:10,  knockbackScaling:0.30, angle:27, hitboxSize:{w:50,h:26}, hitboxOffset:{x:38,y:-26}, startupFrames:13, activeFrames:5, endLagFrames:24 },
+      nair:   { damage:9, knockbackBase:4.5, knockbackScaling:0.17, angle:44, hitboxSize:{w:48,h:48}, hitboxOffset:{x:0,y:-26},  startupFrames:6,  activeFrames:7, endLagFrames:13 },
+      uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.17, angle:80, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-36}, startupFrames:5, activeFrames:8, endLagFrames:11, recoveryVx:3, recoveryVy:15 },
+      sspecial: { damage:9, knockbackBase:5,   knockbackScaling:0.19, angle:22, hitboxSize:{w:44,h:22}, hitboxOffset:{x:34,y:-24}, startupFrames:8,  activeFrames:5, endLagFrames:16, dashBoost:7 },
+      // counter: negates and reflects an incoming hit while active, from either side
+      dspecial: { damage:14, knockbackBase:8, knockbackScaling:0.26, angle:30, hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-26}, startupFrames:4, activeFrames:10, endLagFrames:20, counter:true },
+    },
+    // neutral special auto-cycles through these 3 elemental bolts every cast
+    nspecialModes: [
+      { damage:8,  knockbackBase:4,   knockbackScaling:0.18, angle:24, hitboxSize:{w:20,h:20}, hitboxOffset:{x:30,y:-24}, startupFrames:12, activeFrames:2, endLagFrames:18,
+        projectile:true, projectileSpeed:7,  projectileLife:60, projectileSize:{w:20,h:20} },
+      { damage:6,  knockbackBase:5,   knockbackScaling:0.22, angle:30, hitboxSize:{w:18,h:18}, hitboxOffset:{x:28,y:-24}, startupFrames:14, activeFrames:2, endLagFrames:20,
+        projectile:true, projectileSpeed:5,  projectileLife:65, projectileSize:{w:18,h:18} },
+      { damage:10, knockbackBase:4.5, knockbackScaling:0.17, angle:14, hitboxSize:{w:14,h:10}, hitboxOffset:{x:32,y:-22}, startupFrames:9,  activeFrames:2, endLagFrames:16,
+        projectile:true, projectileSpeed:13, projectileLife:50, projectileSize:{w:14,h:10} },
+    ]
   }
 };
-const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f','#ff5566','#5ee6c9','#c9a876'];
+const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f','#ff5566','#5ee6c9','#c9a876','#6b7bff'];
+
+// Embedded character portraits (SVG markup) — no external files needed.
+const PORTRAITS = {
+  golem: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-golem" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#a8f2ff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#4fe3ff" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-golem" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4fe3ff"/>
+      <stop offset="100%" stop-color="#a8f2ff"/>
+    </linearGradient>
+    <filter id="glow-golem" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-golem)"/>
+  <g stroke-width="1" stroke="#4fe3ff" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-golem)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#4fe3ff" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-golem)">
+    
+    <polygon points="120,42 158,66 168,108 154,150 174,182 150,208 128,196 112,196 90,208 66,182 86,150 72,108 82,66"
+             fill="#1c2440" stroke="#4fe3ff" stroke-width="3"/>
+    <polygon points="120,58 146,74 152,104 142,132 98,132 88,104 94,74" fill="#141a30" stroke="#4fe3ff" stroke-width="1.5" opacity="0.8"/>
+    <line x1="100" y1="80" x2="112" y2="100" stroke="#4fe3ff" stroke-width="2" opacity="0.6"/>
+    <line x1="140" y1="86" x2="130" y2="106" stroke="#4fe3ff" stroke-width="2" opacity="0.6"/>
+    <circle cx="106" cy="104" r="6" fill="#4fe3ff"/>
+    <circle cx="134" cy="104" r="6" fill="#4fe3ff"/>
+    <rect x="98" y="150" width="44" height="10" fill="#4fe3ff" opacity="0.5"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#4fe3ff" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#4fe3ff">GOLEM</text>
+</svg>`,
+  kitsune: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-kitsune" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ffb3ee" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#ff4fd8" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-kitsune" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff4fd8"/>
+      <stop offset="100%" stop-color="#ffb3ee"/>
+    </linearGradient>
+    <filter id="glow-kitsune" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-kitsune)"/>
+  <g stroke-width="1" stroke="#ff4fd8" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-kitsune)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#ff4fd8" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-kitsune)">
+    
+    <path d="M120 50 L96 96 Q120 84 120 84 Q120 84 144 96 Z" fill="#1c2440" stroke="#ff4fd8" stroke-width="3"/>
+    <path d="M96 96 Q70 100 62 132 Q86 118 100 112 Z" fill="#1c2440" stroke="#ff4fd8" stroke-width="2.5"/>
+    <path d="M144 96 Q170 100 178 132 Q154 118 140 112 Z" fill="#1c2440" stroke="#ff4fd8" stroke-width="2.5"/>
+    <path d="M100 112 Q120 100 140 112 Q150 140 120 158 Q90 140 100 112 Z" fill="#141a30" stroke="#ff4fd8" stroke-width="2"/>
+    <path d="M110 128 Q120 122 130 128" stroke="#ff4fd8" stroke-width="2.5" fill="none"/>
+    <path d="M60 170 Q40 190 46 214" stroke="#ff4fd8" stroke-width="4" fill="none" opacity="0.7"/>
+    <path d="M90 178 Q78 202 86 222" stroke="#ff4fd8" stroke-width="4" fill="none" opacity="0.7"/>
+    <path d="M150 178 Q162 202 154 222" stroke="#ff4fd8" stroke-width="4" fill="none" opacity="0.7"/>
+    <path d="M180 170 Q200 190 194 214" stroke="#ff4fd8" stroke-width="4" fill="none" opacity="0.7"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#ff4fd8" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#ff4fd8">KITSUNE</text>
+</svg>`,
+  lancer: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-lancer" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ffe9a8" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#ffcf4f" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-lancer" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffcf4f"/>
+      <stop offset="100%" stop-color="#ffe9a8"/>
+    </linearGradient>
+    <filter id="glow-lancer" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-lancer)"/>
+  <g stroke-width="1" stroke="#ffcf4f" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-lancer)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#ffcf4f" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-lancer)">
+    
+    <polygon points="120,48 152,72 152,124 120,150 88,124 88,72" fill="#1c2440" stroke="#ffcf4f" stroke-width="3"/>
+    <polygon points="120,66 140,82 140,112 120,128 100,112 100,82" fill="#141a30" stroke="#ffcf4f" stroke-width="1.5"/>
+    <rect x="106" y="92" width="28" height="8" fill="#ffcf4f" opacity="0.8"/>
+    <line x1="40" y1="210" x2="196" y2="54" stroke="#ffcf4f" stroke-width="5"/>
+    <polygon points="196,54 210,40 214,58 196,54" fill="#ffcf4f"/>
+    <line x1="60" y1="196" x2="76" y2="212" stroke="#ffcf4f" stroke-width="5"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#ffcf4f" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#ffcf4f">LANCER</text>
+</svg>`,
+  sylph: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-sylph" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#c9ffce" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#7dff8a" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-sylph" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7dff8a"/>
+      <stop offset="100%" stop-color="#c9ffce"/>
+    </linearGradient>
+    <filter id="glow-sylph" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-sylph)"/>
+  <g stroke-width="1" stroke="#7dff8a" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-sylph)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#7dff8a" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-sylph)">
+    
+    <path d="M120 60 Q170 60 170 100 Q170 140 120 140 Q84 140 84 112" fill="none" stroke="#7dff8a" stroke-width="4"/>
+    <path d="M84 112 Q80 130 100 132" fill="none" stroke="#7dff8a" stroke-width="4"/>
+    <polygon points="100,132 88,128 98,144" fill="#7dff8a"/>
+    <path d="M60 90 Q30 70 30 40" stroke="#7dff8a" stroke-width="3" fill="none" opacity="0.7"/>
+    <path d="M74 108 Q40 96 34 66" stroke="#7dff8a" stroke-width="3" fill="none" opacity="0.7"/>
+    <path d="M180 90 Q210 70 210 40" stroke="#7dff8a" stroke-width="3" fill="none" opacity="0.7"/>
+    <path d="M166 108 Q200 96 206 66" stroke="#7dff8a" stroke-width="3" fill="none" opacity="0.7"/>
+    <circle cx="120" cy="100" r="10" fill="#7dff8a" opacity="0.85"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#7dff8a" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#7dff8a">SYLPH</text>
+</svg>`,
+  volt: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-volt" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ded0ff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#b48cff" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-volt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b48cff"/>
+      <stop offset="100%" stop-color="#ded0ff"/>
+    </linearGradient>
+    <filter id="glow-volt" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-volt)"/>
+  <g stroke-width="1" stroke="#b48cff" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-volt)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#b48cff" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-volt)">
+    
+    <polygon points="136,44 92,120 116,120 100,196 156,108 128,108" fill="#1c2440" stroke="#b48cff" stroke-width="3.5"/>
+    <circle cx="60" cy="70" r="5" fill="#b48cff"/>
+    <circle cx="180" cy="70" r="5" fill="#b48cff"/>
+    <circle cx="60" cy="176" r="5" fill="#b48cff"/>
+    <circle cx="180" cy="176" r="5" fill="#b48cff"/>
+    <line x1="60" y1="70" x2="92" y2="120" stroke="#b48cff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="180" y1="70" x2="156" y2="108" stroke="#b48cff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="60" y1="176" x2="100" y2="196" stroke="#b48cff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="180" y1="176" x2="140" y2="150" stroke="#b48cff" stroke-width="1.5" opacity="0.6"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#b48cff" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#b48cff">VOLT</text>
+</svg>`,
+  shinobi: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-shinobi" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ffcfa8" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#ff9a4f" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-shinobi" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff9a4f"/>
+      <stop offset="100%" stop-color="#ffcfa8"/>
+    </linearGradient>
+    <filter id="glow-shinobi" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-shinobi)"/>
+  <g stroke-width="1" stroke="#ff9a4f" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-shinobi)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#ff9a4f" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-shinobi)">
+    
+    <path d="M120 50 Q168 56 168 104 Q168 150 120 168 Q72 150 72 104 Q72 56 120 50 Z" fill="#1c2440" stroke="#ff9a4f" stroke-width="3"/>
+    <rect x="66" y="88" width="108" height="20" fill="#ff9a4f" opacity="0.85"/>
+    <polygon points="174,94 200,84 196,106" fill="#ff9a4f" opacity="0.85"/>
+    <circle cx="102" cy="98" r="4" fill="#0a0d18"/>
+    <circle cx="138" cy="98" r="4" fill="#0a0d18"/>
+    <path d="M96 132 Q120 144 144 132" stroke="#ff9a4f" stroke-width="2.5" fill="none"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#ff9a4f" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#ff9a4f">SHINOBI</text>
+</svg>`,
+  ronin: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-ronin" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ffb3ba" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#ff5566" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-ronin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff5566"/>
+      <stop offset="100%" stop-color="#ffb3ba"/>
+    </linearGradient>
+    <filter id="glow-ronin" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-ronin)"/>
+  <g stroke-width="1" stroke="#ff5566" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-ronin)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#ff5566" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-ronin)">
+    
+    <path d="M120 48 Q160 52 164 96 Q168 140 140 172 L100 172 Q72 140 76 96 Q80 52 120 48 Z" fill="#1c2440" stroke="#ff5566" stroke-width="3"/>
+    <path d="M84 100 Q120 84 156 100" stroke="#ff5566" stroke-width="3" fill="none"/>
+    <circle cx="102" cy="112" r="5" fill="#ff5566"/>
+    <circle cx="138" cy="112" r="5" fill="#ff5566"/>
+    <path d="M92 148 Q120 164 148 148" stroke="#ff5566" stroke-width="3" fill="none"/>
+    <line x1="120" y1="48" x2="120" y2="24" stroke="#ff5566" stroke-width="4"/>
+    <circle cx="120" cy="20" r="7" fill="#ff5566"/>
+    <path d="M60 200 Q120 190 180 200" stroke="#ff5566" stroke-width="2" fill="none" opacity="0.5"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#ff5566" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#ff5566">RONIN</text>
+</svg>`,
+  cobra: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-cobra" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#b9f7ec" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#5ee6c9" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-cobra" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5ee6c9"/>
+      <stop offset="100%" stop-color="#b9f7ec"/>
+    </linearGradient>
+    <filter id="glow-cobra" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-cobra)"/>
+  <g stroke-width="1" stroke="#5ee6c9" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-cobra)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#5ee6c9" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-cobra)">
+    
+    <path d="M70 190 Q70 150 110 150 Q150 150 150 112 Q150 76 116 76" fill="none" stroke="#5ee6c9" stroke-width="10" stroke-linecap="round"/>
+    <path d="M116 76 Q102 76 96 62" fill="none" stroke="#5ee6c9" stroke-width="10" stroke-linecap="round"/>
+    <polygon points="80,50 112,58 90,80 70,66" fill="#1c2440" stroke="#5ee6c9" stroke-width="3"/>
+    <circle cx="84" cy="60" r="3.5" fill="#5ee6c9"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#5ee6c9" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#5ee6c9">COBRA</text>
+</svg>`,
+  forge: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-forge" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ecdcc0" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#c9a876" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-forge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c9a876"/>
+      <stop offset="100%" stop-color="#ecdcc0"/>
+    </linearGradient>
+    <filter id="glow-forge" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-forge)"/>
+  <g stroke-width="1" stroke="#c9a876" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-forge)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#c9a876" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-forge)">
+    
+    <line x1="60" y1="60" x2="176" y2="180" stroke="#c9a876" stroke-width="8" stroke-linecap="round"/>
+    <polygon points="55,52 78,60 68,74 46,66" fill="#c9a876"/>
+    <path d="M84 168 L156 168 L172 190 L148 200 L120 190 L92 200 L68 190 Z" fill="#1c2440" stroke="#c9a876" stroke-width="3.5"/>
+    <rect x="112" y="150" width="16" height="22" fill="#1c2440" stroke="#c9a876" stroke-width="3"/>
+    <circle cx="60" cy="120" r="3" fill="#c9a876" opacity="0.8"/>
+    <circle cx="176" cy="100" r="3" fill="#c9a876" opacity="0.8"/>
+    <circle cx="188" cy="130" r="2.5" fill="#c9a876" opacity="0.7"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#c9a876" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#c9a876">FORGE</text>
+</svg>`,
+  astra: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-astra" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#c3caff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#6b7bff" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-astra" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6b7bff"/>
+      <stop offset="100%" stop-color="#c3caff"/>
+    </linearGradient>
+    <filter id="glow-astra" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-astra)"/>
+  <g stroke-width="1" stroke="#6b7bff" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-astra)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#6b7bff" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-astra)">
+    
+    <path d="M120 96 Q90 130 120 190 Q150 130 120 96 Z" fill="#1c2440" stroke="#6b7bff" stroke-width="3"/>
+    <polygon points="120,36 130,72 166,72 137,94 148,130 120,108 92,130 103,94 74,72 110,72"
+              fill="#6b7bff" opacity="0.9"/>
+    <circle cx="60" cy="150" r="3" fill="#6b7bff"/>
+    <circle cx="182" cy="150" r="3" fill="#6b7bff"/>
+    <circle cx="70" cy="190" r="2.5" fill="#6b7bff" opacity="0.7"/>
+    <circle cx="172" cy="190" r="2.5" fill="#6b7bff" opacity="0.7"/>
+    
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#6b7bff" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#6b7bff">ASTRA</text>
+</svg>`,
+};
 
 
 // ---------- INPUT ----------
@@ -442,11 +988,11 @@ let players = [];
 let select = {
   p1type:'golem', p2type:'kitsune',
   p1color:0, p2color:1,
-  p2cpu:false,
+  p2cpu:false, p2level:5,
 };
 
 // ---------- PLAYER FACTORY ----------
-function createPlayer(id, x, color, type, isCPU, keys){
+function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
   const t = CHARACTERS[type];
   return {
     id, color, type, isCPU, keys, charData: t,
@@ -468,10 +1014,12 @@ function createPlayer(id, x, color, type, isCPU, keys){
     recoveryUsed: false,
     ledge: false,
     respawnTimer: 0,
-    aiTimer: 0, aiState:'approach',
+    aiTimer: 0, aiState:'approach', cpuLevel: cpuLevel||5,
+    learn: {shield:0, jump:0, attack:0, grab:0, samples:0},
     motionDownFrames: 0, motionForwardWindow: 0,
     armMode: 0,
     tier: 0,
+    countering: false,
   };
 }
 
@@ -479,13 +1027,13 @@ function resetMatch(){
   const c1 = COLORS[select.p1color], c2 = COLORS[select.p2color];
   players = [
     createPlayer(1, 330, c1, select.p1type, false, KEY_BINDINGS.p1),
-    createPlayer(2, 630, c2, select.p2type, select.p2cpu, KEY_BINDINGS.p2),
+    createPlayer(2, 630, c2, select.p2type, select.p2cpu, KEY_BINDINGS.p2, select.p2level),
   ];
   matchTimer = 120*60;
   particles = [];
   projectiles = [];
   hitstop = 0; shake = 0;
-  document.getElementById('p2cpuTag').textContent = select.p2cpu ? '[CPU]' : '';
+  document.getElementById('p2cpuTag').textContent = select.p2cpu ? '[CPU Lv.'+select.p2level+']' : '';
 }
 
 // ---------- STATE MACHINE RULES ----------
@@ -517,8 +1065,24 @@ function readInput(p, other){
   };
 }
 
-// ---------- SIMPLE CPU AI ----------
+// ---------- SIMPLE CPU AI (level 1-9, levels 7-9 adapt to the human's habits) ----------
 function aiInput(p, other){
+  const lvl = Math.max(1, Math.min(9, p.cpuLevel||5));
+
+  // passive learning: sample the human opponent's behavior every frame, all
+  // match long. Only levels above 6 actually act on it (see learnWeight).
+  if(!other.isCPU){
+    p.learn.samples++;
+    if(other.isShielding) p.learn.shield++;
+    if(other.state==='jump' && other.stateTimer===0) p.learn.jump++;
+    if(other.attack && other.attack.timer===1) p.learn.attack++;
+    if(other.state==='grabbing' && other.stateTimer===0) p.learn.grab++;
+  }
+  const learnWeight = Math.max(0, (lvl-6)/3); // 0 up to lvl6, ramps to 1 at lvl9
+  const enoughData = p.learn.samples > 90;
+  const shieldFreq = enoughData ? p.learn.shield/p.learn.samples : 0;
+  const jumpFreq = enoughData ? p.learn.jump/p.learn.samples : 0;
+
   p.aiTimer--;
   const dx = other.x - p.x;
   const dist = Math.abs(dx);
@@ -534,31 +1098,47 @@ function aiInput(p, other){
   }
 
   if(p.aiTimer <= 0){
-    p.aiTimer = 20 + Math.floor(Math.random()*20);
+    // higher level = faster decision cycling (quicker reactions)
+    const baseInterval = Math.max(5, 26 - lvl*2);
+    p.aiTimer = baseInterval + Math.floor(Math.random()*baseInterval*0.6);
     const heavyDamage = p.damagePercent > 70;
+    const mistakeChance = Math.max(0, 0.42 - lvl*0.045); // sloppy at lvl1, sharp at lvl9
     const r = Math.random();
-    if(heavyDamage && r < 0.35) p.aiState = 'evade';
+    if(heavyDamage && r < (0.3 + lvl*0.02)) p.aiState = 'evade';
     else if(dist < 70) p.aiState = 'attack';
     else p.aiState = 'approach';
+    if(Math.random() < mistakeChance){
+      // a lower-level CPU occasionally second-guesses itself into a worse choice
+      p.aiState = 'approach';
+    }
   }
 
   if(p.aiState === 'approach'){
-    if(dx > 12){ out.right = true; out.dashHeld = true; }
-    else if(dx < -12){ out.left = true; out.dashHeld = true; }
+    if(dx > 12){ out.right = true; out.dashHeld = lvl>=3; }
+    else if(dx < -12){ out.left = true; out.dashHeld = lvl>=3; }
     if(other.y < p.y - 40 && p.onGround) out.up = true;
   } else if(p.aiState === 'attack'){
     if(dist < 65){
-      const r = Math.random();
-      out.attackPressed = r < 0.35;
-      out.smashPressed = !out.attackPressed && r < 0.5;
-      out.specialPressed = !out.attackPressed && !out.smashPressed && r < 0.65;
-      out.grabPressed = !out.attackPressed && !out.smashPressed && !out.specialPressed && Math.random() < 0.2;
+      // learned habit: if the human shields a lot, favor grabbing instead of attacking into it
+      const grabBias = shieldFreq * learnWeight;
+      if(Math.random() < grabBias*0.7){
+        out.grabPressed = true;
+      } else {
+        const r = Math.random();
+        const skill = lvl*0.035; // higher level leans on smash/special more than plain jabs
+        out.attackPressed = r < Math.max(0.15, 0.4 - skill);
+        out.smashPressed = !out.attackPressed && r < 0.4+skill*0.5;
+        out.specialPressed = !out.attackPressed && !out.smashPressed && r < 0.6+skill;
+        out.grabPressed = !out.attackPressed && !out.smashPressed && !out.specialPressed && Math.random() < 0.2;
+      }
       if(dx>0) out.right = true; else out.left = true;
     } else {
       if(dx>0) out.right = true; else out.left = true;
     }
   } else if(p.aiState === 'evade'){
-    out.shield = Math.random() < 0.6;
+    // learned habit: against a jump-happy human, lean on spacing/anti-air instead of pure shield
+    const preferAntiAir = jumpFreq * learnWeight;
+    out.shield = Math.random() < (0.35 + lvl*0.03) && Math.random() > preferAntiAir*0.6;
     if(!out.shield && Math.random()<0.3) out.up = true;
     if(dx>0) out.left = true; else out.right = true;
   }
@@ -651,6 +1231,10 @@ function updateAttackHitbox(p, other){
     spawnParticles(p.x, p.y-p.h/2, p.color);
   }
 
+  // counter stance: active only during this move's active window, works
+  // regardless of which side the incoming hit comes from
+  p.countering = !!(move.counter && a.timer >= activeStart && a.timer < activeEnd);
+
   if(move.projectile){
     // Ranged move: fires a traveling hitbox instead of a body-attached one.
     if(a.timer === activeStart && !a.projSpawned){
@@ -663,7 +1247,15 @@ function updateAttackHitbox(p, other){
     const hw = move.hitboxSize.w, hh = move.hitboxSize.h;
     if(rectOverlap(hbX-hw/2, hbY-hh/2, hw, hh, other.x-other.w/2, other.y-other.h, other.w, other.h) && other.invincible<=0){
       a.hit = true;
-      if(other.isShielding){
+      if(other.countering){
+        // countered! the incoming attack is negated and redirected back onto its own sender
+        const counterMove = other.attack ? other.attack.move : null;
+        other.countering = false;
+        if(other.attack){ other.attack = null; }
+        setState(other, other.onGround ? 'idle' : 'fall');
+        if(counterMove) applyMoveHit(p, other, counterMove);
+        hitstop = 8; shake = 5;
+      } else if(other.isShielding){
         other.shieldHP -= move.damage*3.4;
         p.vx = -p.facing*2;
         if(other.shieldHP <= 0){
@@ -704,7 +1296,14 @@ function updateProjectiles(){
     if(pr.dead) return;
     const target = pr.owner === pa ? pb : pa;
     if(target.invincible<=0 && rectOverlap(pr.x-pr.w/2, pr.y-pr.h/2, pr.w, pr.h, target.x-target.w/2, target.y-target.h, target.w, target.h)){
-      if(target.isShielding){
+      if(target.countering){
+        const counterMove = target.attack ? target.attack.move : null;
+        target.countering = false;
+        target.attack = null;
+        setState(target, target.onGround ? 'idle' : 'fall');
+        if(counterMove) applyMoveHit(pr.owner, target, counterMove);
+        hitstop = 8; shake = 5;
+      } else if(target.isShielding){
         target.shieldHP -= pr.move.damage*3.4;
         if(target.shieldHP <= 0){
           target.shieldHP = 0; setState(target,'shieldbreak'); target.isShielding=false; target.hitstunFrames=180;
@@ -727,8 +1326,10 @@ function rectOverlap(ax,ay,aw,ah,bx,by,bw,bh){
 
 // ---------- GRAB / THROW ----------
 function startGrab(p, other){
-  const gx = p.x + p.facing*(p.w/2+18);
-  if(Math.abs(gx - other.x) < 26 && Math.abs(p.y - other.y) < other.h && other.state!=='hitstun' && !other.grabbedBy){
+  // grab range: generous window in front of the character, roomier than a
+  // normal melee hitbox since whiffed grabs already carry their own lag penalty
+  const gx = p.x + p.facing*(p.w/2+26);
+  if(Math.abs(gx - other.x) < 36 && Math.abs(p.y - other.y) < other.h*1.3 && other.state!=='hitstun' && !other.grabbedBy){
     other.grabbedBy = p;
     p.grabbing = other;
     setState(other, 'grabbed');
@@ -870,13 +1471,17 @@ function updatePlayer(p, other, dt){
         sKey = 'nspecial';
       }
       if(sKey){
-        // arm-mode weapon swap: nspecial's actual stats come from the
-        // character's currently-selected weapon mode instead of a fixed move
-        const modeMove = (sKey === 'nspecial' && p.charData.armModes) ? p.charData.armModes[p.armMode||0] : null;
+        // nspecial mode-swap: stats come from the character's currently-selected
+        // mode instead of a fixed move. cycleMode decides how the mode advances:
+        // 'dspecial' = manual swap button, 'cast' = auto-advances every cast.
+        const modeMove = (sKey === 'nspecial' && p.charData.nspecialModes) ? p.charData.nspecialModes[p.armMode||0] : null;
         executeMove(p, sKey, modeMove);
         const mv = modeMove || p.charData.moves[sKey];
-        if(sKey === 'dspecial' && p.charData.armModes){
-          p.armMode = ((p.armMode||0)+1) % p.charData.armModes.length;
+        if(sKey === 'dspecial' && p.charData.nspecialModes && p.charData.cycleMode === 'dspecial'){
+          p.armMode = ((p.armMode||0)+1) % p.charData.nspecialModes.length;
+        }
+        if(sKey === 'nspecial' && p.charData.nspecialModes && p.charData.cycleMode === 'cast'){
+          p.armMode = ((p.armMode||0)+1) % p.charData.nspecialModes.length;
         }
         if(sKey === 'sspecial' && mv.dashBoost){
           p.vx = p.facing*mv.dashBoost;
@@ -1271,12 +1876,28 @@ function buildSelectUI(){
       el.appendChild(sw);
     });
   }
+  function buildCpuLevels(){
+    const el = document.getElementById('cpuLevelChips');
+    el.innerHTML = '';
+    if(!select.p2cpu) return;
+    for(let i=1;i<=9;i++){
+      const chip = document.createElement('div');
+      chip.className = 'chip'+(select.p2level===i?' active p2':'');
+      chip.textContent = 'Lv.'+i + (i>=7?' 🧠':'');
+      chip.title = i===9 ? 'トッププロ級・学習AI' : i>=7 ? '学習AI' : '';
+      chip.onclick = ()=>{ select.p2level=i; buildSelectUI(); };
+      el.appendChild(chip);
+    }
+  }
   buildTypes('p1types','p1type','p1');
   buildTypes('p2types','p2type','p2');
   buildColors('p1colors','p1color');
   buildColors('p2colors','p2color');
+  buildCpuLevels();
   document.getElementById('p1desc').textContent = CHARACTERS[select.p1type].desc;
   document.getElementById('p2desc').textContent = CHARACTERS[select.p2type].desc;
+  document.getElementById('p1portrait').innerHTML = PORTRAITS[select.p1type] || '';
+  document.getElementById('p2portrait').innerHTML = PORTRAITS[select.p2type] || '';
   document.getElementById('cpuToggle').textContent = 'CPU: '+(select.p2cpu?'ON':'OFF');
 }
 
