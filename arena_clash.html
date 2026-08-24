@@ -314,9 +314,52 @@ const CHARACTERS = {
       // bonus signature move: only comes out via the down->forward->special motion input
       command:  { damage:16, knockbackBase:9,  knockbackScaling:0.28, angle:24, hitboxSize:{w:50,h:24}, hitboxOffset:{x:40,y:-24}, startupFrames:9, activeFrames:6, endLagFrames:20 },
     }
+  },
+  cobra: {
+    label: 'COBRA', desc: '伸びる左右の腕による飛び道具攻撃(nspecial/sspecial)とキック主体の近接技を使い分ける万能型。下必殺技で右腕の武器を3種類（曲線軌道/重量弾/標準ビーム）に切り替えられる。',
+    weight: 88, walkSpeed: 4.0, dashSpeed: 6.2, jumpPower: 12.0, size: 33, extraJumps: 1,
+    moves: {
+      jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4,  activeFrames:3, endLagFrames:8 },
+      ftilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:40,h:18}, hitboxOffset:{x:30,y:-22}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
+      utilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:85, hitboxSize:{w:28,h:36}, hitboxOffset:{x:12,y:-46}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
+      dtilt:  { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:6,  hitboxSize:{w:46,h:12}, hitboxOffset:{x:32,y:-4},  startupFrames:6,  activeFrames:4, endLagFrames:12 },
+      fsmash: { damage:16,knockbackBase:9,   knockbackScaling:0.28, angle:60, hitboxSize:{w:40,h:26}, hitboxOffset:{x:26,y:-46}, startupFrames:13, activeFrames:5, endLagFrames:24 },
+      nair:   { damage:8, knockbackBase:4,   knockbackScaling:0.16, angle:44, hitboxSize:{w:50,h:50}, hitboxOffset:{x:0,y:-26},  startupFrames:5,  activeFrames:7, endLagFrames:12 },
+      uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.17, angle:85, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34}, startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:2, recoveryVy:16.5 },
+      // right arm: 3 swappable weapon modes cycled by dspecial, selected at runtime via getScaledMove-style override
+      sspecial: { damage:8, knockbackBase:4, knockbackScaling:0.17, angle:20, hitboxSize:{w:60,h:20}, hitboxOffset:{x:44,y:-24}, startupFrames:11, activeFrames:4, endLagFrames:18,
+                  projectile:true, projectileSpeed:8, projectileLife:60, projectileSize:{w:20,h:16} },
+      dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.08, angle:30, hitboxSize:{w:24,h:24}, hitboxOffset:{x:0,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:10 },
+    },
+    // the three right-arm weapon modes nspecial cycles through via dspecial
+    armModes: [
+      { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:70,h:22}, hitboxOffset:{x:50,y:-24}, startupFrames:10, activeFrames:3, endLagFrames:16,
+        projectile:true, projectileSpeed:7,  projectileLife:55, projectileSize:{w:24,h:22} },
+      { damage:14, knockbackBase:8,   knockbackScaling:0.26, angle:26, hitboxSize:{w:34,h:30}, hitboxOffset:{x:30,y:-24}, startupFrames:16, activeFrames:3, endLagFrames:24,
+        projectile:true, projectileSpeed:4,  projectileLife:45, projectileSize:{w:26,h:26} },
+      { damage:6,  knockbackBase:3,   knockbackScaling:0.15, angle:14, hitboxSize:{w:16,h:10}, hitboxOffset:{x:34,y:-22}, startupFrames:8,  activeFrames:2, endLagFrames:14,
+        projectile:true, projectileSpeed:12, projectileLife:60, projectileSize:{w:16,h:10} },
+    ]
+  },
+  forge: {
+    label: 'FORGE', desc: '採掘(nspecial)で素材ランクを上げると、剣や斧を使う技(jab/ftilt/utilt/dtilt/fsmash/nair)の威力・発生速度・リーチが段階的に強化される成長型。',
+    weight: 92, walkSpeed: 3.9, dashSpeed: 5.6, jumpPower: 11.0, size: 35, extraJumps: 1,
+    tierMultipliers: [0.7, 0.85, 1.0, 1.15, 1.35],
+    moves: {
+      jab:    { damage:6, knockbackBase:3,   knockbackScaling:0.16, angle:36, hitboxSize:{w:34,h:18}, hitboxOffset:{x:28,y:-22}, startupFrames:6,  activeFrames:4, endLagFrames:11, scalesWithTier:true },
+      ftilt:  { damage:8, knockbackBase:4.5, knockbackScaling:0.19, angle:28, hitboxSize:{w:46,h:18}, hitboxOffset:{x:34,y:-22}, startupFrames:8,  activeFrames:5, endLagFrames:15, scalesWithTier:true },
+      utilt:  { damage:8, knockbackBase:4.5, knockbackScaling:0.18, angle:84, hitboxSize:{w:30,h:42}, hitboxOffset:{x:12,y:-52}, startupFrames:8,  activeFrames:5, endLagFrames:15, scalesWithTier:true },
+      dtilt:  { damage:6, knockbackBase:3.5, knockbackScaling:0.15, angle:8,  hitboxSize:{w:44,h:12}, hitboxOffset:{x:30,y:-4},  startupFrames:7,  activeFrames:4, endLagFrames:14, scalesWithTier:true },
+      fsmash: { damage:19,knockbackBase:11,  knockbackScaling:0.32, angle:27, hitboxSize:{w:54,h:26}, hitboxOffset:{x:40,y:-26}, startupFrames:15, activeFrames:5, endLagFrames:28, scalesWithTier:true },
+      nair:   { damage:9, knockbackBase:4.5, knockbackScaling:0.18, angle:44, hitboxSize:{w:48,h:48}, hitboxOffset:{x:0,y:-26},  startupFrames:7,  activeFrames:7, endLagFrames:15, scalesWithTier:true },
+      uspecial:    { damage:7, knockbackBase:4, knockbackScaling:0.16, angle:70, hitboxSize:{w:40,h:30}, hitboxOffset:{x:0,y:-30}, startupFrames:5, activeFrames:8, endLagFrames:14, recoveryVx:4.8, recoveryVy:11 },
+      nspecial: { damage:3, knockbackBase:1.5, knockbackScaling:0.08, angle:40, hitboxSize:{w:26,h:26}, hitboxOffset:{x:20,y:-20}, startupFrames:10, activeFrames:4, endLagFrames:18, mineTier:true },
+      sspecial: { damage:10, knockbackBase:6,  knockbackScaling:0.22, angle:18, hitboxSize:{w:46,h:24}, hitboxOffset:{x:34,y:-24}, startupFrames:10, activeFrames:6, endLagFrames:18, dashBoost:8 },
+      dspecial: { damage:13, knockbackBase:7,  knockbackScaling:0.26, angle:35, hitboxSize:{w:44,h:44}, hitboxOffset:{x:0,y:-22},  startupFrames:18, activeFrames:4, endLagFrames:26 },
+    }
   }
 };
-const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f','#ff5566'];
+const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f','#ff5566','#5ee6c9','#c9a876'];
 
 
 // ---------- INPUT ----------
@@ -428,6 +471,7 @@ function createPlayer(id, x, color, type, isCPU, keys){
     aiTimer: 0, aiState:'approach',
     motionDownFrames: 0, motionForwardWindow: 0,
     armMode: 0,
+    tier: 0,
   };
 }
 
@@ -576,6 +620,21 @@ function executeMove(p, moveKey, overrideMove){
   setState(p, 'attack');
 }
 
+// A move flagged `scalesWithTier` gets its damage/knockback/reach/speed
+// scaled by the character's current material tier (see p.tier / mineTier).
+function getScaledMove(p, moveKey){
+  const move = p.charData.moves[moveKey];
+  if(!move || !move.scalesWithTier || !p.charData.tierMultipliers) return move;
+  const mult = p.charData.tierMultipliers[p.tier||0];
+  return {
+    ...move,
+    damage: move.damage*mult,
+    knockbackBase: move.knockbackBase*mult,
+    hitboxSize: {w: move.hitboxSize.w*(0.85+0.15*mult), h: move.hitboxSize.h*(0.85+0.15*mult)},
+    startupFrames: Math.max(2, Math.round(move.startupFrames*(1.15-0.15*mult))),
+  };
+}
+
 function updateAttackHitbox(p, other){
   if(!p.attack) return;
   const a = p.attack;
@@ -584,6 +643,13 @@ function updateAttackHitbox(p, other){
   const activeStart = move.startupFrames;
   const activeEnd = activeStart + move.activeFrames;
   const total = activeEnd + move.endLagFrames;
+
+  if(move.mineTier && a.timer === activeStart && !a.mined){
+    const maxTier = (p.charData.tierMultipliers ? p.charData.tierMultipliers.length : 1) - 1;
+    p.tier = Math.min(maxTier, (p.tier||0)+1);
+    a.mined = true;
+    spawnParticles(p.x, p.y-p.h/2, p.color);
+  }
 
   if(move.projectile){
     // Ranged move: fires a traveling hitbox instead of a body-attached one.
@@ -825,17 +891,17 @@ function updatePlayer(p, other, dt){
       }
     } else if(input.attackPressed){
       if(!p.onGround){
-        executeMove(p, 'nair');
+        executeMove(p, 'nair', getScaledMove(p, 'nair'));
       } else {
         let moveKey;
         if(input.aimUp) moveKey = 'utilt';
         else if(input.down) moveKey = 'dtilt';
         else if(input.left || input.right || p.lastDir !== 0) moveKey = 'ftilt';
         else moveKey = 'jab';
-        executeMove(p, moveKey);
+        executeMove(p, moveKey, getScaledMove(p, moveKey));
       }
     } else if(input.smashPressed && p.onGround){
-      executeMove(p, 'fsmash');
+      executeMove(p, 'fsmash', getScaledMove(p, 'fsmash'));
     }
   }
   if(p.state === 'attack') updateAttackHitbox(p, other);
@@ -1155,6 +1221,12 @@ function drawPlayer(p){
   CTX.fillStyle = p.color;
   CTX.textAlign='center';
   CTX.fillText(Math.floor(p.damagePercent)+'%', p.x, p.y-p.h-26);
+  // material-tier indicator (FORGE-style characters only)
+  if(p.charData.tierMultipliers){
+    CTX.font = '9px Space Mono';
+    CTX.fillStyle = 'rgba(255,255,255,0.75)';
+    CTX.fillText('T'+((p.tier||0)+1)+'/'+p.charData.tierMultipliers.length, p.x, p.y-p.h-38);
+  }
   CTX.restore();
 }
 function roundRect(ctx,x,y,w,h,r){
