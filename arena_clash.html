@@ -127,7 +127,10 @@
       <div>ダメージ%が高いほど吹っ飛びが大きくなる。画面外（バーストライン）に出たら撃墜。</div>
     </div>
     <div class="blink">PRESS SPACE TO START</div>
-    <button class="ghost" id="openKeyConfigBtn">キー設定</button>
+    <div style="display:flex; gap:10px;">
+      <button class="ghost" id="openKeyConfigBtn">キー設定</button>
+      <button class="ghost" id="openTrainBtn">AI個別強化モード</button>
+    </div>
   </div>
 
   <div id="keyConfigScreen" class="screen hidden">
@@ -142,6 +145,27 @@
       </div>
     </div>
     <button class="ghost" id="closeKeyConfigBtn">戻る</button>
+  </div>
+
+  <div id="trainingScreen" class="screen hidden">
+    <h1 class="logo" style="font-size:28px;">AI 個別強化モード</h1>
+    <div class="sub">AIキャラを選び、高速で自己対戦させて学習データを蓄積します（約100試行）</div>
+    <div class="selectRow">
+      <div class="fighterCol" style="width:220px;">
+        <h3 style="color:var(--gold)">訓練するAI</h3>
+        <div class="chips" id="trainTypes"></div>
+      </div>
+      <div class="fighterCol" style="width:220px;">
+        <h3 style="color:var(--gold)">CPUレベル</h3>
+        <div class="chips" id="trainLevels"></div>
+      </div>
+    </div>
+    <div class="panel" id="trainStats" style="width:460px;"></div>
+    <div style="display:flex; gap:12px;">
+      <button class="big" id="startTrainBtn">特訓開始 (約100試行)</button>
+      <button class="ghost" id="resetAIBtn">学習データをリセット</button>
+    </div>
+    <button class="ghost" id="closeTrainBtn">戻る</button>
   </div>
 
   <div id="selectScreen" class="screen hidden">
@@ -257,7 +281,7 @@ const CHARACTERS = {
       dtilt:  { damage:4, knockbackBase:1.8, knockbackScaling:0.11, angle:14, hitboxSize:{w:30,h:10}, hitboxOffset:{x:20,y:-6},  startupFrames:4,  activeFrames:4,  endLagFrames:9 },
       fsmash: { damage:12,knockbackBase:5,   knockbackScaling:0.22, angle:30, hitboxSize:{w:40,h:18}, hitboxOffset:{x:28,y:-20}, startupFrames:10, activeFrames:5,  endLagFrames:18 },
       nair:   { damage:13,knockbackBase:6.5, knockbackScaling:0.22, angle:50, hitboxSize:{w:58,h:58}, hitboxOffset:{x:0,y:-30},  startupFrames:5,  activeFrames:12, endLagFrames:12 },
-      uspecial:    { damage:7, knockbackBase:3.5, knockbackScaling:0.14, angle:85, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-34},  startupFrames:4,  activeFrames:10, endLagFrames:8, recoveryVx:5.4, recoveryVy:18 },
+      uspecial:    { damage:7, knockbackBase:3.5, knockbackScaling:0.14, angle:85, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-34},  startupFrames:4,  activeFrames:10, endLagFrames:8, recoveryVx:5.4, recoveryVy:18, recoveryType:'glide' },
       nspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:50,  hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-26},  startupFrames:8, activeFrames:6, endLagFrames:12 },
       sspecial: { damage:6, knockbackBase:2.6, knockbackScaling:0.13, angle:24,  hitboxSize:{w:36,h:20}, hitboxOffset:{x:26,y:-22}, startupFrames:6, activeFrames:5, endLagFrames:10, dashBoost:6 },
       dspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:-70, hitboxSize:{w:38,h:16}, hitboxOffset:{x:20,y:-4},  startupFrames:6, activeFrames:5, endLagFrames:10 },
@@ -277,7 +301,7 @@ const CHARACTERS = {
       fsmash: { damage:16, knockbackBase:8,  knockbackScaling:0.30, angle:26, hitboxSize:{w:30,h:20}, hitboxOffset:{x:40,y:-26}, startupFrames:22, activeFrames:1, endLagFrames:30,
                 projectile:true, projectileSpeed:6, projectileLife:90, projectileSize:{w:30,h:20} },
       nair:   { damage:7, knockbackBase:3.5, knockbackScaling:0.15, angle:42, hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-24},  startupFrames:6,  activeFrames:6, endLagFrames:14 },
-      uspecial:    { damage:8, knockbackBase:4,   knockbackScaling:0.15, angle:80, hitboxSize:{w:32,h:32}, hitboxOffset:{x:0,y:-32},  startupFrames:5,  activeFrames:7, endLagFrames:9, recoveryVx:3.2, recoveryVy:14.5 },
+      uspecial:    { damage:8, knockbackBase:4,   knockbackScaling:0.15, angle:80, hitboxSize:{w:32,h:32}, hitboxOffset:{x:0,y:-32},  startupFrames:5,  activeFrames:7, endLagFrames:9, recoveryVx:3.2, recoveryVy:14.5, recoveryType:'teleport' },
       // specials stay in-theme: nspecial/dspecial are more projectiles, sspecial is a melee gap-closer
       nspecial: { damage:5, knockbackBase:2.5, knockbackScaling:0.14, angle:20, hitboxSize:{w:14,h:8}, hitboxOffset:{x:28,y:-22}, startupFrames:7, activeFrames:1, endLagFrames:14,
                   projectile:true, projectileSpeed:11, projectileLife:50, projectileSize:{w:14,h:8} },
@@ -321,7 +345,7 @@ const CHARACTERS = {
     }
   },
   cobra: {
-    label: 'COBRA', desc: '伸びる左右の腕による飛び道具攻撃(nspecial/sspecial)とキック主体の近接技を使い分ける万能型。下必殺技で右腕の武器を3種類（曲線軌道/重量弾/標準ビーム）に切り替えられる。',
+    label: 'COBRA', desc: '伸びる左右の腕で殴りつける、リーチの長い近接特化型（飛び道具は使わない）。下必殺技で右腕の武器を3種類（曲線軌道/重量級/標準）に切り替えられる。',
     weight: 88, walkSpeed: 4.0, dashSpeed: 6.2, jumpPower: 12.0, size: 33, extraJumps: 1, cycleMode: 'dspecial',
     moves: {
       jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4,  activeFrames:3, endLagFrames:8 },
@@ -330,24 +354,21 @@ const CHARACTERS = {
       dtilt:  { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:6,  hitboxSize:{w:46,h:12}, hitboxOffset:{x:32,y:-4},  startupFrames:6,  activeFrames:4, endLagFrames:12 },
       fsmash: { damage:16,knockbackBase:9,   knockbackScaling:0.28, angle:60, hitboxSize:{w:40,h:26}, hitboxOffset:{x:26,y:-46}, startupFrames:13, activeFrames:5, endLagFrames:24 },
       nair:   { damage:8, knockbackBase:4,   knockbackScaling:0.16, angle:44, hitboxSize:{w:50,h:50}, hitboxOffset:{x:0,y:-26},  startupFrames:5,  activeFrames:7, endLagFrames:12 },
-      uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.17, angle:85, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34}, startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:2, recoveryVy:16.5 },
-      // right arm: 3 swappable weapon modes cycled by dspecial, selected at runtime via getScaledMove-style override
-      sspecial: { damage:8, knockbackBase:4, knockbackScaling:0.17, angle:20, hitboxSize:{w:60,h:20}, hitboxOffset:{x:44,y:-24}, startupFrames:11, activeFrames:4, endLagFrames:18,
-                  projectile:true, projectileSpeed:8, projectileLife:60, projectileSize:{w:20,h:16} },
+      // arm-hook recovery: snaps straight to the ledge if in range (see recoveryType:'tether')
+      uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.17, angle:85, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34}, startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:2, recoveryVy:12, recoveryType:'tether' },
+      // left arm: a long melee reach, not a flying projectile — the arm itself stretches out to hit
+      sspecial: { damage:8, knockbackBase:4, knockbackScaling:0.17, angle:20, hitboxSize:{w:26,h:18}, hitboxOffset:{x:78,y:-24}, startupFrames:11, activeFrames:4, endLagFrames:18, extendingArm:true },
       dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.08, angle:30, hitboxSize:{w:24,h:24}, hitboxOffset:{x:0,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:10 },
     },
-    // the three right-arm weapon modes nspecial cycles through via dspecial
+    // the three right-arm weapon modes nspecial cycles through via dspecial — all melee reach, not projectiles
     nspecialModes: [
-      { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:70,h:22}, hitboxOffset:{x:50,y:-24}, startupFrames:10, activeFrames:3, endLagFrames:16,
-        projectile:true, projectileSpeed:7,  projectileLife:55, projectileSize:{w:24,h:22} },
-      { damage:14, knockbackBase:8,   knockbackScaling:0.26, angle:26, hitboxSize:{w:34,h:30}, hitboxOffset:{x:30,y:-24}, startupFrames:16, activeFrames:3, endLagFrames:24,
-        projectile:true, projectileSpeed:4,  projectileLife:45, projectileSize:{w:26,h:26} },
-      { damage:6,  knockbackBase:3,   knockbackScaling:0.15, angle:14, hitboxSize:{w:16,h:10}, hitboxOffset:{x:34,y:-22}, startupFrames:8,  activeFrames:2, endLagFrames:14,
-        projectile:true, projectileSpeed:12, projectileLife:60, projectileSize:{w:16,h:10} },
+      { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:30,h:22}, hitboxOffset:{x:88,y:-24}, startupFrames:10, activeFrames:3, endLagFrames:16, extendingArm:true },
+      { damage:14, knockbackBase:8,   knockbackScaling:0.26, angle:26, hitboxSize:{w:32,h:30}, hitboxOffset:{x:60,y:-24}, startupFrames:16, activeFrames:3, endLagFrames:24, extendingArm:true },
+      { damage:6,  knockbackBase:3,   knockbackScaling:0.15, angle:14, hitboxSize:{w:22,h:14}, hitboxOffset:{x:70,y:-22}, startupFrames:8,  activeFrames:2, endLagFrames:14, extendingArm:true },
     ]
   },
   forge: {
-    label: 'FORGE', desc: '採掘(nspecial)で素材ランクを上げると、剣や斧を使う技(jab/ftilt/utilt/dtilt/fsmash/nair)の威力・発生速度・リーチが段階的に強化される成長型。',
+    label: 'FORGE', desc: '採掘(nspecial)で素材ランクを上げると、剣や斧を使う技の威力・発生速度・リーチが段階的に強化される。稀に手に入る強化素材で武具を「強化」できるが、使い続けると壊れる。下必殺技で足場を設置可能。',
     weight: 92, walkSpeed: 3.9, dashSpeed: 5.6, jumpPower: 11.0, size: 35, extraJumps: 1,
     tierMultipliers: [0.7, 0.85, 1.0, 1.15, 1.35],
     moves: {
@@ -357,15 +378,17 @@ const CHARACTERS = {
       dtilt:  { damage:6, knockbackBase:3.5, knockbackScaling:0.15, angle:8,  hitboxSize:{w:44,h:12}, hitboxOffset:{x:30,y:-4},  startupFrames:7,  activeFrames:4, endLagFrames:14, scalesWithTier:true },
       fsmash: { damage:19,knockbackBase:11,  knockbackScaling:0.32, angle:27, hitboxSize:{w:54,h:26}, hitboxOffset:{x:40,y:-26}, startupFrames:15, activeFrames:5, endLagFrames:28, scalesWithTier:true },
       nair:   { damage:9, knockbackBase:4.5, knockbackScaling:0.18, angle:44, hitboxSize:{w:48,h:48}, hitboxOffset:{x:0,y:-26},  startupFrames:7,  activeFrames:7, endLagFrames:15, scalesWithTier:true },
-      uspecial:    { damage:7, knockbackBase:4, knockbackScaling:0.16, angle:70, hitboxSize:{w:40,h:30}, hitboxOffset:{x:0,y:-30}, startupFrames:5, activeFrames:8, endLagFrames:14, recoveryVx:4.8, recoveryVy:11 },
+      // recovery also drops a temporary foothold beneath the character (see recoveryType:'platform')
+      uspecial:    { damage:7, knockbackBase:4, knockbackScaling:0.16, angle:70, hitboxSize:{w:40,h:30}, hitboxOffset:{x:0,y:-30}, startupFrames:5, activeFrames:8, endLagFrames:14, recoveryVx:3.2, recoveryVy:8, recoveryType:'platform' },
       nspecial: { damage:3, knockbackBase:1.5, knockbackScaling:0.08, angle:40, hitboxSize:{w:26,h:26}, hitboxOffset:{x:20,y:-20}, startupFrames:10, activeFrames:4, endLagFrames:18, mineTier:true },
       sspecial: { damage:10, knockbackBase:6,  knockbackScaling:0.22, angle:18, hitboxSize:{w:46,h:24}, hitboxOffset:{x:34,y:-24}, startupFrames:10, activeFrames:6, endLagFrames:18, dashBoost:8 },
-      dspecial: { damage:13, knockbackBase:7,  knockbackScaling:0.26, angle:35, hitboxSize:{w:44,h:44}, hitboxOffset:{x:0,y:-22},  startupFrames:18, activeFrames:4, endLagFrames:26 },
+      // down special: place a temporary standable platform instead of a bomb
+      dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.10, angle:30, hitboxSize:{w:30,h:20}, hitboxOffset:{x:0,y:-10}, startupFrames:14, activeFrames:3, endLagFrames:20, placesPlatform:true },
     }
   },
   astra: {
     label: 'ASTRA', desc: '必殺ワザは使うたびに炎・氷・雷の3属性が自動で切り替わる魔法剣士型。下必殺技はカウンター技で、背後からの攻撃も受け止めて反撃できる。',
-    weight: 82, walkSpeed: 4.3, dashSpeed: 6.5, jumpPower: 12.4, size: 32, extraJumps: 1, cycleMode: 'cast',
+    weight: 82, walkSpeed: 4.3, dashSpeed: 6.5, jumpPower: 12.4, size: 32, extraJumps: 2, gravityMult: 0.8, cycleMode: 'cast',
     moves: {
       jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.13, angle:36, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:4,  activeFrames:3, endLagFrames:7 },
       ftilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.17, angle:26, hitboxSize:{w:40,h:18}, hitboxOffset:{x:30,y:-22}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
@@ -378,14 +401,13 @@ const CHARACTERS = {
       // counter: negates and reflects an incoming hit while active, from either side
       dspecial: { damage:14, knockbackBase:8, knockbackScaling:0.26, angle:30, hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-26}, startupFrames:4, activeFrames:10, endLagFrames:20, counter:true },
     },
-    // neutral special auto-cycles through these 3 elemental bolts every cast
+    // neutral special auto-cycles every cast: fire (burn DOT) -> ice (freeze, short range) -> thunder (instant strike, not a slow-traveling shot)
     nspecialModes: [
-      { damage:8,  knockbackBase:4,   knockbackScaling:0.18, angle:24, hitboxSize:{w:20,h:20}, hitboxOffset:{x:30,y:-24}, startupFrames:12, activeFrames:2, endLagFrames:18,
-        projectile:true, projectileSpeed:7,  projectileLife:60, projectileSize:{w:20,h:20} },
-      { damage:6,  knockbackBase:5,   knockbackScaling:0.22, angle:30, hitboxSize:{w:18,h:18}, hitboxOffset:{x:28,y:-24}, startupFrames:14, activeFrames:2, endLagFrames:20,
-        projectile:true, projectileSpeed:5,  projectileLife:65, projectileSize:{w:18,h:18} },
-      { damage:10, knockbackBase:4.5, knockbackScaling:0.17, angle:14, hitboxSize:{w:14,h:10}, hitboxOffset:{x:32,y:-22}, startupFrames:9,  activeFrames:2, endLagFrames:16,
-        projectile:true, projectileSpeed:13, projectileLife:50, projectileSize:{w:14,h:10} },
+      { damage:5, knockbackBase:2,   knockbackScaling:0.12, angle:24, hitboxSize:{w:20,h:20}, hitboxOffset:{x:30,y:-24}, startupFrames:12, activeFrames:2, endLagFrames:18,
+        projectile:true, projectileSpeed:7, projectileLife:60, projectileSize:{w:20,h:20}, burnDamage:2, burnTicks:4, burnInterval:20 },
+      { damage:4, knockbackBase:0.5, knockbackScaling:0.02, angle:20, hitboxSize:{w:16,h:16}, hitboxOffset:{x:22,y:-22}, startupFrames:14, activeFrames:2, endLagFrames:20,
+        projectile:true, projectileSpeed:5, projectileLife:30, projectileSize:{w:16,h:16}, freezeFrames:50 },
+      { damage:10, knockbackBase:5,   knockbackScaling:0.18, angle:16, hitboxSize:{w:70,h:14}, hitboxOffset:{x:52,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:16 },
     ]
   }
 };
@@ -977,12 +999,91 @@ function buildKeyConfigUI(){
 document.getElementById('openKeyConfigBtn').onclick = ()=>{ show('keyConfigScreen'); buildKeyConfigUI(); };
 document.getElementById('closeKeyConfigBtn').onclick = ()=>{ show('titleScreen'); };
 
+// ---------- AI TRAINING MODE ----------
+// Runs many short, fast, unrendered CPU-vs-CPU trials in a single burst so the
+// persistent AI_PROFILE (see loadAIProfile/saveAIProfile above) accumulates
+// habit data quickly instead of waiting on real matches.
+let trainSelect = { type: 'kitsune', level: 9 };
+
+function buildTrainUI(){
+  const typeEl = document.getElementById('trainTypes');
+  typeEl.innerHTML = '';
+  Object.keys(CHARACTERS).forEach(key=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip'+(trainSelect.type===key?' active p1':'');
+    chip.textContent = CHARACTERS[key].label;
+    chip.onclick = ()=>{ trainSelect.type=key; buildTrainUI(); };
+    typeEl.appendChild(chip);
+  });
+  const lvlEl = document.getElementById('trainLevels');
+  lvlEl.innerHTML = '';
+  for(let i=1;i<=9;i++){
+    const chip = document.createElement('div');
+    chip.className = 'chip'+(trainSelect.level===i?' active p1':'');
+    chip.textContent = 'Lv.'+i;
+    chip.onclick = ()=>{ trainSelect.level=i; buildTrainUI(); };
+    lvlEl.appendChild(chip);
+  }
+  document.getElementById('trainStats').innerHTML =
+    `<div><b>これまでの学習試行回数:</b> ${AI_PROFILE.matches||0} 回</div>
+     <div><b>観測サンプル数:</b> ${AI_PROFILE.samples||0}（ガード率 ${pct(AI_PROFILE.shield,AI_PROFILE.samples)}％ / ジャンプ率 ${pct(AI_PROFILE.jump,AI_PROFILE.samples)}％）</div>`;
+}
+function pct(n,total){ return total>0 ? Math.round(100*n/total) : 0; }
+
+function runTrainingSession(trials, aiType, aiLevel){
+  const savedPlayers = players, savedProjectiles = projectiles, savedTemp = tempPlatforms;
+  trainingMode = true;
+  const dummyTypes = Object.keys(CHARACTERS).filter(k=>k!==aiType);
+  let completed = 0;
+  for(let t=0; t<trials; t++){
+    const dummyType = dummyTypes[Math.floor(Math.random()*dummyTypes.length)] || aiType;
+    const ai = createPlayer(1, 330, COLORS[0], aiType, true, KEY_BINDINGS.p1, aiLevel);
+    const dummy = createPlayer(2, 630, COLORS[1], dummyType, true, KEY_BINDINGS.p2, 5);
+    ai.stocks = 1; dummy.stocks = 1;
+    players = [ai, dummy];
+    projectiles = [];
+    tempPlatforms = [];
+    let ticks = 0;
+    while(ticks < 500 && ai.stocks>0 && dummy.stocks>0){
+      updatePlayer(ai, dummy);
+      updatePlayer(dummy, ai);
+      updateProjectiles();
+      ticks++;
+    }
+    AI_PROFILE = {shield:ai.learn.shield, jump:ai.learn.jump, attack:ai.learn.attack, grab:ai.learn.grab, samples:ai.learn.samples, matches:(AI_PROFILE.matches||0)+1};
+    completed++;
+  }
+  saveAIProfile();
+  trainingMode = false;
+  hitstop = 0; shake = 0; particles = [];
+  players = savedPlayers; projectiles = savedProjectiles; tempPlatforms = savedTemp;
+  return completed;
+}
+
+document.getElementById('openTrainBtn').onclick = ()=>{ show('trainingScreen'); buildTrainUI(); };
+document.getElementById('closeTrainBtn').onclick = ()=>{ show('titleScreen'); };
+document.getElementById('startTrainBtn').onclick = ()=>{
+  const btn = document.getElementById('startTrainBtn');
+  btn.textContent = '特訓中...';
+  setTimeout(()=>{
+    const n = runTrainingSession(100, trainSelect.type, trainSelect.level);
+    btn.textContent = '特訓開始 (約100試行)';
+    buildTrainUI();
+  }, 30);
+};
+document.getElementById('resetAIBtn').onclick = ()=>{
+  AI_PROFILE = {shield:0, jump:0, attack:0, grab:0, samples:0, matches:0};
+  saveAIProfile();
+  buildTrainUI();
+};
+
 // ---------- GAME STATE ----------
-let gameState = 'TITLE'; // TITLE, SELECT, MATCH, RESULT
+let gameState = 'TITLE'; // TITLE, SELECT, MATCH, RESULT, TRAINING
 let hitstop = 0;
 let shake = 0;
 let particles = [];
 let projectiles = [];
+let tempPlatforms = []; // player-built platforms (FORGE), separate from the fixed stage layout
 let matchTimer = 120*60; // frames, 2 min at 60fps
 let players = [];
 let select = {
@@ -990,6 +1091,23 @@ let select = {
   p1color:0, p2color:1,
   p2cpu:false, p2level:5,
 };
+let trainingMode = false; // true while a fast headless training session is running
+
+// ---------- PERSISTENT AI LEARNING ----------
+// Survives across matches AND across browser sessions (this is a standalone
+// file the person runs in their own browser, so localStorage persists normally).
+const AI_PROFILE_KEY = 'neonArenaAIProfile_v1';
+function loadAIProfile(){
+  try {
+    const raw = localStorage.getItem(AI_PROFILE_KEY);
+    if(raw){ const parsed = JSON.parse(raw); if(parsed && typeof parsed.samples==='number') return parsed; }
+  } catch(e){}
+  return {shield:0, jump:0, attack:0, grab:0, samples:0, matches:0};
+}
+function saveAIProfile(){
+  try { localStorage.setItem(AI_PROFILE_KEY, JSON.stringify(AI_PROFILE)); } catch(e){}
+}
+let AI_PROFILE = loadAIProfile();
 
 // ---------- PLAYER FACTORY ----------
 function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
@@ -1015,10 +1133,14 @@ function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
     ledge: false,
     respawnTimer: 0,
     aiTimer: 0, aiState:'approach', cpuLevel: cpuLevel||5,
-    learn: {shield:0, jump:0, attack:0, grab:0, samples:0},
+    learn: isCPU ? {shield:AI_PROFILE.shield, jump:AI_PROFILE.jump, attack:AI_PROFILE.attack, grab:AI_PROFILE.grab, samples:AI_PROFILE.samples}
+                 : {shield:0, jump:0, attack:0, grab:0, samples:0},
     motionDownFrames: 0, motionForwardWindow: 0,
     armMode: 0,
     tier: 0,
+    enhanceMaterial: 0, reinforcedHitsLeft: 0,
+    dot: null,
+    glideFramesLeft: 0, glideLift: 0,
     countering: false,
   };
 }
@@ -1032,6 +1154,7 @@ function resetMatch(){
   matchTimer = 120*60;
   particles = [];
   projectiles = [];
+  tempPlatforms = [];
   hitstop = 0; shake = 0;
   document.getElementById('p2cpuTag').textContent = select.p2cpu ? '[CPU Lv.'+select.p2level+']' : '';
 }
@@ -1178,6 +1301,15 @@ function applyMoveHit(target, attacker, move){
     kb *= 1.25;
   }
   resolveHit(target, attacker, move.angle || 40, kb, move.damage);
+  // freeze/restrain: overrides the normal knockback-derived hitstun with a fixed duration
+  if(move.freezeFrames){
+    target.hitstunFrames = move.freezeFrames;
+    setState(target, 'hitstun');
+  }
+  // burn: a damage-over-time status that ticks independently of hitstun
+  if(move.burnDamage){
+    target.dot = { dmgPerTick: move.burnDamage, ticksLeft: move.burnTicks||3, tickTimer:0, tickEvery: move.burnInterval||20 };
+  }
 }
 
 function spawnParticles(x,y,color){
@@ -1186,6 +1318,12 @@ function spawnParticles(x,y,color){
     const sp = 2+Math.random()*4;
     particles.push({x,y,vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:18+Math.random()*10, color});
   }
+}
+
+// A player-built platform (FORGE). Lasts a while, then crumbles.
+function spawnTempPlatform(p){
+  tempPlatforms.push({ x: p.x-45, y: p.y, w:90, h:14, drop:true, life:900, owner:p });
+  spawnParticles(p.x, p.y, p.color);
 }
 
 // ---------- GENERIC MOVE ENGINE ----------
@@ -1202,10 +1340,13 @@ function executeMove(p, moveKey, overrideMove){
 
 // A move flagged `scalesWithTier` gets its damage/knockback/reach/speed
 // scaled by the character's current material tier (see p.tier / mineTier).
+// A temporary "reinforced" bonus (from banked enhancement material) stacks on
+// top, but wears off after a handful of uses (see p.reinforcedHitsLeft).
 function getScaledMove(p, moveKey){
   const move = p.charData.moves[moveKey];
   if(!move || !move.scalesWithTier || !p.charData.tierMultipliers) return move;
-  const mult = p.charData.tierMultipliers[p.tier||0];
+  let mult = p.charData.tierMultipliers[p.tier||0];
+  if(p.reinforcedHitsLeft > 0) mult += 0.25;
   return {
     ...move,
     damage: move.damage*mult,
@@ -1213,6 +1354,65 @@ function getScaledMove(p, moveKey){
     hitboxSize: {w: move.hitboxSize.w*(0.85+0.15*mult), h: move.hitboxSize.h*(0.85+0.15*mult)},
     startupFrames: Math.max(2, Math.round(move.startupFrames*(1.15-0.15*mult))),
   };
+}
+
+// Recovery mechanics differ per character (recoveryType on the uspecial move),
+// not just numbers. Falls back to a plain velocity burst if unspecified.
+function performRecovery(p, mv){
+  const rtype = mv.recoveryType || 'burst';
+  if(rtype === 'tether'){
+    // arm-hook / grapple: snap straight onto the ledge if within range, otherwise a weak fallback burst
+    const edgeL = STAGE.floor.x, edgeR = STAGE.floor.x+STAGE.floor.w;
+    const distL = Math.abs(p.x-edgeL), distR = Math.abs(p.x-edgeR);
+    if(!p.onGround && Math.min(distL,distR) < 260 && p.y < STAGE.floor.y+80){
+      const targetX = distL<distR ? edgeL : edgeR;
+      p.x = targetX; p.y = STAGE.floor.y-4; p.vx=0; p.vy=0;
+      setState(p,'ledge'); p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
+    } else {
+      p.vy = -(mv.recoveryVy||10)*0.7; p.vx = p.facing*(mv.recoveryVx||2);
+      p.onGround=false; p.standingPlatform=null; p.helpless=true; p.recoveryUsed=true;
+    }
+  } else if(rtype === 'teleport'){
+    // blink: instantly relocate in the facing direction with brief invincibility, no travel arc
+    const dist = (mv.recoveryVx||3)*22;
+    p.x += p.facing*dist;
+    p.vy = -(mv.recoveryVy||8)*0.4; p.vx = 0;
+    p.invincible = 14;
+    p.onGround=false; p.standingPlatform=null; p.helpless=true; p.recoveryUsed=true;
+  } else if(rtype === 'platform'){
+    // build a foothold and hop onto it
+    spawnTempPlatform(p);
+    p.vy = -(mv.recoveryVy||8); p.vx = p.facing*(mv.recoveryVx||0);
+    p.onGround=false; p.standingPlatform=null; p.helpless=true; p.recoveryUsed=true;
+  } else if(rtype === 'glide'){
+    // sustained rise over ~22 frames instead of one instant burst, floatier feel
+    p.glideFramesLeft = 22;
+    p.glideLift = (mv.recoveryVy||10)/22;
+    p.vx = p.facing*(mv.recoveryVx||3)*0.5;
+    p.onGround=false; p.standingPlatform=null; p.helpless=true; p.recoveryUsed=true;
+  } else {
+    // burst: one-time velocity launch (the default)
+    p.vy = -(mv.recoveryVy||0);
+    p.vx = p.facing*(mv.recoveryVx||0);
+    p.onGround = false; p.standingPlatform = null;
+    p.helpless = true; p.recoveryUsed = true;
+  }
+  spawnParticles(p.x, p.y, p.color);
+}
+
+// Consumes/arms FORGE's "reinforced" bonus. Each swing of a scalesWithTier
+// move while reinforced burns down its remaining durability; once banked
+// enhancement material is available, the next swing arms a fresh reinforcement.
+function tickReinforcement(p, moveKey){
+  const move = p.charData.moves[moveKey];
+  if(!move || !move.scalesWithTier || !p.charData.tierMultipliers) return;
+  if(p.reinforcedHitsLeft > 0){
+    p.reinforcedHitsLeft--;
+    if(p.reinforcedHitsLeft === 0) spawnParticles(p.x, p.y-p.h/2, '#ff5566'); // it breaks
+  } else if(p.enhanceMaterial > 0){
+    p.enhanceMaterial--;
+    p.reinforcedHitsLeft = 5;
+  }
 }
 
 function updateAttackHitbox(p, other){
@@ -1229,6 +1429,17 @@ function updateAttackHitbox(p, other){
     p.tier = Math.min(maxTier, (p.tier||0)+1);
     a.mined = true;
     spawnParticles(p.x, p.y-p.h/2, p.color);
+    // chance of also finding a rare enhancement material while mining
+    if(Math.random() < 0.3){
+      p.enhanceMaterial = Math.min(3, (p.enhanceMaterial||0)+1);
+      spawnParticles(p.x, p.y-p.h/2, '#c9a876');
+    }
+  }
+
+  // FORGE: places a temporary standable platform at the moment of use
+  if(move.placesPlatform && a.timer === activeStart && !a.placed){
+    spawnTempPlatform(p);
+    a.placed = true;
   }
 
   // counter stance: active only during this move's active window, works
@@ -1355,6 +1566,18 @@ function updatePlayer(p, other, dt){
   p.frameCount++;
   const input = readInput(p, other);
   if(p.invincible>0) p.invincible--;
+
+  // ---- BURN (damage-over-time status, e.g. ASTRA's fire bolt) ----
+  if(p.dot && p.dot.ticksLeft > 0){
+    p.dot.tickTimer++;
+    if(p.dot.tickTimer >= p.dot.tickEvery){
+      p.damagePercent += p.dot.dmgPerTick;
+      p.dot.ticksLeft--;
+      p.dot.tickTimer = 0;
+      spawnParticles(p.x, p.y-p.h/2, '#ff9a4f');
+      if(p.dot.ticksLeft <= 0) p.dot = null;
+    }
+  }
 
   // ---- GRABBED: fully controlled by grabber ----
   if(p.state === 'grabbed'){
@@ -1487,16 +1710,13 @@ function updatePlayer(p, other, dt){
           p.vx = p.facing*mv.dashBoost;
         }
         if(sKey === 'uspecial'){
-          p.vy = -(mv.recoveryVy||0);
-          p.vx = p.facing*(mv.recoveryVx||0);
-          p.onGround = false; p.standingPlatform = null;
-          p.helpless = true; p.recoveryUsed = true;
-          spawnParticles(p.x, p.y, p.color);
+          performRecovery(p, mv);
         }
       }
     } else if(input.attackPressed){
       if(!p.onGround){
         executeMove(p, 'nair', getScaledMove(p, 'nair'));
+        tickReinforcement(p, 'nair');
       } else {
         let moveKey;
         if(input.aimUp) moveKey = 'utilt';
@@ -1504,9 +1724,11 @@ function updatePlayer(p, other, dt){
         else if(input.left || input.right || p.lastDir !== 0) moveKey = 'ftilt';
         else moveKey = 'jab';
         executeMove(p, moveKey, getScaledMove(p, moveKey));
+        tickReinforcement(p, moveKey);
       }
     } else if(input.smashPressed && p.onGround){
       executeMove(p, 'fsmash', getScaledMove(p, 'fsmash'));
+      tickReinforcement(p, 'fsmash');
     }
   }
   if(p.state === 'attack') updateAttackHitbox(p, other);
@@ -1567,7 +1789,12 @@ function updatePlayer(p, other, dt){
 
   // ---- GRAVITY ----
   if(!p.onGround){
-    p.vy += GRAVITY;
+    if(p.glideFramesLeft > 0){
+      p.vy -= p.glideLift;
+      if(p.vy < -10) p.vy = -10;
+      p.glideFramesLeft--;
+    }
+    p.vy += GRAVITY * (p.charData.gravityMult||1);
     if(p.vy > MAX_FALL) p.vy = MAX_FALL;
     if(p.vy > 2 && p.state!=='attack' && p.state!=='hitstun' && p.state!=='helpless') setState(p,'fall');
   }
@@ -1584,7 +1811,7 @@ function updatePlayer(p, other, dt){
     if(p.x > STAGE.floor.x-p.w/2 && p.x < STAGE.floor.x+STAGE.floor.w+p.w/2 && feet >= STAGE.floor.y && feet - p.vy <= STAGE.floor.y+2){
       p.y = STAGE.floor.y; p.vy = 0; landed = true; p.standingPlatform = STAGE.floor;
     } else if(!(p.dropCooldown > 0)) {
-      for(const pl of STAGE.platforms){
+      for(const pl of STAGE.platforms.concat(tempPlatforms)){
         if(p.x > pl.x-p.w/2 && p.x < pl.x+pl.w+p.w/2 && feet >= pl.y && feet - p.vy <= pl.y+2){
           p.y = pl.y; p.vy = 0; landed = true; p.standingPlatform = pl;
           break;
@@ -1654,6 +1881,8 @@ function updateMatch(){
 
   particles.forEach(pt=>{ pt.x+=pt.vx; pt.y+=pt.vy; pt.vy+=0.15; pt.life--; });
   particles = particles.filter(pt=>pt.life>0);
+  tempPlatforms.forEach(pl=>pl.life--);
+  tempPlatforms = tempPlatforms.filter(pl=>pl.life>0);
   if(shake>0) shake *= 0.85; if(shake<0.1) shake=0;
 
   keysPressed.clear();
@@ -1671,6 +1900,13 @@ function updateHUD(){
 }
 
 function endMatch(winnerId){
+  if(trainingMode) return; // headless training sessions handle their own persistence
+  // persist whatever the CPU learned this match (learn already = old profile + new samples)
+  const cpu = players.find(p=>p.isCPU);
+  if(cpu){
+    AI_PROFILE = {shield:cpu.learn.shield, jump:cpu.learn.jump, attack:cpu.learn.attack, grab:cpu.learn.grab, samples:cpu.learn.samples, matches:(AI_PROFILE.matches||0)+1};
+    saveAIProfile();
+  }
   gameState = 'RESULT';
   show('resultScreen');
   const t = document.getElementById('resultText');
@@ -1724,6 +1960,18 @@ function render(){
     CTX.fillRect(pl.x, pl.y, pl.w, pl.h);
     CTX.strokeStyle = 'rgba(255,79,216,0.7)'; CTX.lineWidth=2;
     CTX.strokeRect(pl.x, pl.y, pl.w, pl.h);
+  });
+
+  // player-built platforms (FORGE) — fade out as they near the end of their life
+  tempPlatforms.forEach(pl=>{
+    const alpha = Math.min(1, pl.life/150);
+    CTX.save();
+    CTX.globalAlpha = alpha;
+    CTX.fillStyle = 'rgba(201,168,118,0.4)';
+    CTX.fillRect(pl.x, pl.y, pl.w, pl.h);
+    CTX.strokeStyle = 'rgba(201,168,118,0.85)'; CTX.lineWidth=2;
+    CTX.strokeRect(pl.x, pl.y, pl.w, pl.h);
+    CTX.restore();
   });
 
   // projectiles (ranged move shots)
@@ -1811,9 +2059,17 @@ function drawPlayer(p){
       }
     } else if(a.timer >= move.startupFrames && a.timer < move.startupFrames+move.activeFrames){
       const isSpecial = a.key==='uspecial'||a.key==='nspecial'||a.key==='sspecial'||a.key==='dspecial';
-      CTX.fillStyle = a.key==='command' ? 'rgba(255,85,102,0.65)' : a.key==='fsmash' ? 'rgba(255,207,79,0.6)' : isSpecial ? 'rgba(125,255,138,0.5)' : 'rgba(255,255,255,0.35)';
       const hx = p.facing*move.hitboxOffset.x;
       const hy = move.hitboxOffset.y;
+      if(move.extendingArm){
+        // draw the stretched limb connecting the body to the hitbox tip
+        CTX.strokeStyle = p.color; CTX.lineWidth = 8; CTX.lineCap = 'round';
+        CTX.beginPath();
+        CTX.moveTo(p.facing*8, -p.h*0.6);
+        CTX.lineTo(hx, hy);
+        CTX.stroke();
+      }
+      CTX.fillStyle = a.key==='command' ? 'rgba(255,85,102,0.65)' : a.key==='fsmash' ? 'rgba(255,207,79,0.6)' : isSpecial ? 'rgba(125,255,138,0.5)' : 'rgba(255,255,255,0.35)';
       roundRect(CTX, hx-move.hitboxSize.w/2, hy-move.hitboxSize.h/2, move.hitboxSize.w, move.hitboxSize.h, 8);
       CTX.fill();
     }
@@ -1846,7 +2102,7 @@ function roundRect(ctx,x,y,w,h,r){
 
 // ---------- SCREEN MANAGEMENT ----------
 function show(id){
-  ['titleScreen','selectScreen','resultScreen','keyConfigScreen'].forEach(s=>{
+  ['titleScreen','selectScreen','resultScreen','keyConfigScreen','trainingScreen'].forEach(s=>{
     document.getElementById(s).classList.toggle('hidden', s!==id);
   });
   document.getElementById('hud').classList.toggle('hidden', id!=null);
