@@ -237,7 +237,12 @@ const CHARACTERS = {
       nspecial: { damage:9,  knockbackBase:5, knockbackScaling:0.20, angle:50,  hitboxSize:{w:44,h:44}, hitboxOffset:{x:0,y:-30},  startupFrames:14, activeFrames:6, endLagFrames:20 },
       sspecial: { damage:11, knockbackBase:6, knockbackScaling:0.22, angle:20,  hitboxSize:{w:50,h:28}, hitboxOffset:{x:40,y:-26}, startupFrames:10, activeFrames:6, endLagFrames:18, dashBoost:5 },
       dspecial: { damage:10, knockbackBase:6, knockbackScaling:0.22, angle:-70, hitboxSize:{w:46,h:20}, hitboxOffset:{x:26,y:-6},  startupFrames:9,  activeFrames:5, endLagFrames:16 },
-    }
+    },
+    jabCombo: [
+      { damage:7, knockbackBase:4, knockbackScaling:0.16, angle:42, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:8, activeFrames:5, endLagFrames:14 },
+      { damage:8, knockbackBase:4, knockbackScaling:0.16, angle:42, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:8, activeFrames:5, endLagFrames:12 },
+      { damage:11.2, knockbackBase:9.6, knockbackScaling:0.21, angle:46, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:9, activeFrames:5, endLagFrames:22 },
+    ]
   },
   kitsune: {
     label: 'KITSUNE', desc: '軽量で技の発生が非常に速い。手数と連係で攻めるスタイルで、威力と吹っ飛びは控えめ。',
@@ -253,7 +258,12 @@ const CHARACTERS = {
       nspecial: { damage:5, knockbackBase:2.4, knockbackScaling:0.13, angle:45,  hitboxSize:{w:30,h:30}, hitboxOffset:{x:0,y:-24},  startupFrames:5, activeFrames:5, endLagFrames:9 },
       sspecial: { damage:6, knockbackBase:2.6, knockbackScaling:0.14, angle:18,  hitboxSize:{w:36,h:16}, hitboxOffset:{x:30,y:-20}, startupFrames:4, activeFrames:5, endLagFrames:9, dashBoost:7 },
       dspecial: { damage:5, knockbackBase:2.4, knockbackScaling:0.13, angle:-60, hitboxSize:{w:32,h:14}, hitboxOffset:{x:20,y:-4},  startupFrames:4, activeFrames:4, endLagFrames:8 },
-    }
+    },
+    jabCombo: [
+      { damage:3, knockbackBase:1.6, knockbackScaling:0.1, angle:40, hitboxSize:{w:28,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:2, activeFrames:3, endLagFrames:6 },
+      { damage:3.4, knockbackBase:1.6, knockbackScaling:0.1, angle:40, hitboxSize:{w:28,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:2, activeFrames:3, endLagFrames:4 },
+      { damage:4.8, knockbackBase:3.8, knockbackScaling:0.13, angle:46, hitboxSize:{w:28,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:14 },
+    ]
   },
   lancer: {
     label: 'LANCER', desc: '槍のように長いリーチが武器。差し合いと崖際の攻防が得意だが、スマッシュは大振りで隙が大きい。',
@@ -269,7 +279,12 @@ const CHARACTERS = {
       nspecial: { damage:8, knockbackBase:4,   knockbackScaling:0.17, angle:22,  hitboxSize:{w:76,h:14}, hitboxOffset:{x:58,y:-24}, startupFrames:13, activeFrames:5, endLagFrames:20 },
       sspecial: { damage:9, knockbackBase:4.5, knockbackScaling:0.18, angle:18,  hitboxSize:{w:60,h:18}, hitboxOffset:{x:44,y:-24}, startupFrames:9,  activeFrames:5, endLagFrames:16, dashBoost:6 },
       dspecial: { damage:7, knockbackBase:4,   knockbackScaling:0.15, angle:-65, hitboxSize:{w:50,h:16}, hitboxOffset:{x:34,y:-6},  startupFrames:8,  activeFrames:5, endLagFrames:15 },
-    }
+    },
+    jabCombo: [
+      { damage:6, knockbackBase:3, knockbackScaling:0.16, angle:35, hitboxSize:{w:34,h:18}, hitboxOffset:{x:40,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:12 },
+      { damage:6.9, knockbackBase:3, knockbackScaling:0.16, angle:35, hitboxSize:{w:34,h:18}, hitboxOffset:{x:40,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:10 },
+      { damage:9.6, knockbackBase:7.2, knockbackScaling:0.21, angle:46, hitboxSize:{w:34,h:18}, hitboxOffset:{x:40,y:-24}, startupFrames:7, activeFrames:4, endLagFrames:20 },
+    ]
   },
   sylph: {
     label: 'SYLPH', desc: '空中ジャンプが1回多く非常に浮遊力が高い。地上技は控えめだが空中攻撃と上必殺技が強力。',
@@ -285,7 +300,12 @@ const CHARACTERS = {
       nspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:50,  hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-26},  startupFrames:8, activeFrames:6, endLagFrames:12 },
       sspecial: { damage:6, knockbackBase:2.6, knockbackScaling:0.13, angle:24,  hitboxSize:{w:36,h:20}, hitboxOffset:{x:26,y:-22}, startupFrames:6, activeFrames:5, endLagFrames:10, dashBoost:6 },
       dspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:-70, hitboxSize:{w:38,h:16}, hitboxOffset:{x:20,y:-4},  startupFrames:6, activeFrames:5, endLagFrames:10 },
-    }
+    },
+    jabCombo: [
+      { damage:3, knockbackBase:1.4, knockbackScaling:0.1, angle:40, hitboxSize:{w:26,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:7 },
+      { damage:3.4, knockbackBase:1.4, knockbackScaling:0.1, angle:40, hitboxSize:{w:26,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:5 },
+      { damage:4.8, knockbackBase:3.4, knockbackScaling:0.13, angle:46, hitboxSize:{w:26,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:15 },
+    ]
   },
   volt: {
     label: 'VOLT', desc: '中距離からのエネルギー弾（ftilt / fsmash）でアウトレンジする遠距離特化型。接近されると近接技は控えめで打たれ弱い。',
@@ -308,7 +328,12 @@ const CHARACTERS = {
       sspecial: { damage:8, knockbackBase:4,   knockbackScaling:0.17, angle:20, hitboxSize:{w:38,h:18}, hitboxOffset:{x:28,y:-22}, startupFrames:9,  activeFrames:5, endLagFrames:16, dashBoost:6 },
       dspecial: { damage:6, knockbackBase:3,   knockbackScaling:0.15, angle:8,  hitboxSize:{w:20,h:10}, hitboxOffset:{x:24,y:-2},  startupFrames:12, activeFrames:1, endLagFrames:20,
                   projectile:true, projectileSpeed:6, projectileLife:80, projectileSize:{w:20,h:10} },
-    }
+    },
+    jabCombo: [
+      { damage:4, knockbackBase:2, knockbackScaling:0.14, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:5, activeFrames:4, endLagFrames:11 },
+      { damage:4.6, knockbackBase:2, knockbackScaling:0.14, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:5, activeFrames:4, endLagFrames:9 },
+      { damage:6.4, knockbackBase:4.8, knockbackScaling:0.18, angle:46, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:6, activeFrames:4, endLagFrames:19 },
+    ]
   },
   shinobi: {
     label: 'SHINOBI', desc: '通常技の吹っ飛びが極端に小さく、連続ヒットで手数を稼ぐコンボ特化型。fsmashだけは高威力・高吹っ飛びの締め技。',
@@ -324,10 +349,15 @@ const CHARACTERS = {
       nspecial: { damage:5, knockbackBase:1.8, knockbackScaling:0.09, angle:35,  hitboxSize:{w:32,h:28}, hitboxOffset:{x:0,y:-22},  startupFrames:6, activeFrames:5, endLagFrames:10 },
       sspecial: { damage:6, knockbackBase:2,   knockbackScaling:0.10, angle:20,  hitboxSize:{w:34,h:16}, hitboxOffset:{x:26,y:-20}, startupFrames:5, activeFrames:5, endLagFrames:9, dashBoost:8 },
       dspecial: { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:-70, hitboxSize:{w:34,h:14}, hitboxOffset:{x:20,y:-4},  startupFrames:6, activeFrames:5, endLagFrames:11 },
-    }
+    },
+    jabCombo: [
+      { damage:5, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:6 },
+      { damage:5.8, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:4 },
+      { damage:8, knockbackBase:2.9, knockbackScaling:0.08, angle:46, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:14 },
+    ]
   },
   ronin: {
-    label: 'RONIN', desc: '高威力の万能格闘家。ダメージ100%を超えると全ての技の吹っ飛びが上昇する「怒り」状態に。しゃがみ→前入力から特殊技を出すとコマンド技（強化技）が発動する。',
+    label: 'RONIN', desc: '高威力の万能格闘家。ダメージ100%を超えると全ての技の吹っ飛びが上昇する「怒り」状態に。3種のコマンド技を持つ：しゃがみ→前+特殊技／前→しゃがみ+特殊技／しゃがみ2回連打+特殊技（渾身の昇り技）。',
     weight: 108, walkSpeed: 3.7, dashSpeed: 5.8, jumpPower: 11.2, size: 36, extraJumps: 1, hasRage: true,
     moves: {
       jab:    { damage:6,  knockbackBase:3,   knockbackScaling:0.15, angle:38,  hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
@@ -340,9 +370,19 @@ const CHARACTERS = {
       nspecial: { damage:9,  knockbackBase:5,   knockbackScaling:0.19, angle:40,  hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-26},  startupFrames:10, activeFrames:5, endLagFrames:16 },
       sspecial: { damage:10, knockbackBase:5.5, knockbackScaling:0.20, angle:22,  hitboxSize:{w:42,h:20}, hitboxOffset:{x:32,y:-24}, startupFrames:8,  activeFrames:5, endLagFrames:15, dashBoost:6 },
       dspecial: { damage:9,  knockbackBase:5,   knockbackScaling:0.19, angle:-65, hitboxSize:{w:40,h:18}, hitboxOffset:{x:26,y:-6},  startupFrames:8,  activeFrames:5, endLagFrames:15 },
-      // bonus signature move: only comes out via the down->forward->special motion input
-      command:  { damage:16, knockbackBase:9,  knockbackScaling:0.28, angle:24, hitboxSize:{w:50,h:24}, hitboxOffset:{x:40,y:-24}, startupFrames:9, activeFrames:6, endLagFrames:20 },
-    }
+      // command 1: down -> forward -> special. A hard reversal punch.
+      command:  { damage:16, knockbackBase:9,  knockbackScaling:0.28, angle:24, hitboxSize:{w:50,h:24}, hitboxOffset:{x:40,y:-24}, startupFrames:9,  activeFrames:6, endLagFrames:20 },
+      // command 2: forward -> down -> special. A sweeping low strike, good reach for edge control.
+      command2: { damage:14, knockbackBase:8,  knockbackScaling:0.24, angle:15, hitboxSize:{w:56,h:20}, hitboxOffset:{x:42,y:-14}, startupFrames:10, activeFrames:6, endLagFrames:20 },
+      // command 3: quick down, down -> special. An original "final gale" rising finisher — a
+      // from-scratch reimagining, not a reproduction of any existing character's move.
+      command3: { damage:19, knockbackBase:13, knockbackScaling:0.30, angle:88, hitboxSize:{w:44,h:50}, hitboxOffset:{x:6,y:-56}, startupFrames:12, activeFrames:6, endLagFrames:24 },
+    },
+    jabCombo: [
+      { damage:6, knockbackBase:3, knockbackScaling:0.15, angle:38, hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:12 },
+      { damage:6.9, knockbackBase:3, knockbackScaling:0.15, angle:38, hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:10 },
+      { damage:9.6, knockbackBase:7.2, knockbackScaling:0.2, angle:46, hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:7, activeFrames:4, endLagFrames:20 },
+    ]
   },
   cobra: {
     label: 'COBRA', desc: '伸びる左右の腕で殴りつける、リーチの長い近接特化型（飛び道具は使わない）。下必殺技で右腕の武器を3種類（曲線軌道/重量級/標準）に切り替えられる。',
@@ -360,6 +400,11 @@ const CHARACTERS = {
       sspecial: { damage:8, knockbackBase:4, knockbackScaling:0.17, angle:20, hitboxSize:{w:26,h:18}, hitboxOffset:{x:78,y:-24}, startupFrames:11, activeFrames:4, endLagFrames:18, extendingArm:true },
       dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.08, angle:30, hitboxSize:{w:24,h:24}, hitboxOffset:{x:0,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:10 },
     },
+    jabCombo: [
+      { damage:4, knockbackBase:2, knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:8 },
+      { damage:4.6, knockbackBase:2, knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:6 },
+      { damage:6.4, knockbackBase:4.8, knockbackScaling:0.17, angle:46, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:5, activeFrames:3, endLagFrames:16 },
+    ],
     // the three right-arm weapon modes nspecial cycles through via dspecial — all melee reach, not projectiles
     nspecialModes: [
       { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:30,h:22}, hitboxOffset:{x:88,y:-24}, startupFrames:10, activeFrames:3, endLagFrames:16, extendingArm:true },
@@ -401,6 +446,11 @@ const CHARACTERS = {
       // counter: negates and reflects an incoming hit while active, from either side
       dspecial: { damage:14, knockbackBase:8, knockbackScaling:0.26, angle:30, hitboxSize:{w:40,h:40}, hitboxOffset:{x:0,y:-26}, startupFrames:4, activeFrames:10, endLagFrames:20, counter:true },
     },
+    jabCombo: [
+      { damage:4, knockbackBase:2, knockbackScaling:0.13, angle:36, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:7 },
+      { damage:4.6, knockbackBase:2, knockbackScaling:0.13, angle:36, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:5 },
+      { damage:6.4, knockbackBase:4.8, knockbackScaling:0.17, angle:46, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:5, activeFrames:3, endLagFrames:15 },
+    ],
     // neutral special auto-cycles every cast: fire (burn DOT) -> ice (freeze, short range) -> thunder (instant strike, not a slow-traveling shot)
     nspecialModes: [
       { damage:5, knockbackBase:2,   knockbackScaling:0.12, angle:24, hitboxSize:{w:20,h:20}, hitboxOffset:{x:30,y:-24}, startupFrames:12, activeFrames:2, endLagFrames:18,
@@ -1030,46 +1080,78 @@ function buildTrainUI(){
 }
 function pct(n,total){ return total>0 ? Math.round(100*n/total) : 0; }
 
-function runTrainingSession(trials, aiType, aiLevel){
-  const savedPlayers = players, savedProjectiles = projectiles, savedTemp = tempPlatforms;
-  trainingMode = true;
+// Runs exactly one short CPU-vs-CPU trial and folds its observations into
+// the persistent AI_PROFILE (learn already = old profile + this trial's new
+// samples, so simply copying it over is enough to accumulate).
+function runSingleTrainingTrial(aiType, aiLevel){
   const dummyTypes = Object.keys(CHARACTERS).filter(k=>k!==aiType);
-  let completed = 0;
-  for(let t=0; t<trials; t++){
-    const dummyType = dummyTypes[Math.floor(Math.random()*dummyTypes.length)] || aiType;
-    const ai = createPlayer(1, 330, COLORS[0], aiType, true, KEY_BINDINGS.p1, aiLevel);
-    const dummy = createPlayer(2, 630, COLORS[1], dummyType, true, KEY_BINDINGS.p2, 5);
-    ai.stocks = 1; dummy.stocks = 1;
-    players = [ai, dummy];
-    projectiles = [];
-    tempPlatforms = [];
-    let ticks = 0;
-    while(ticks < 500 && ai.stocks>0 && dummy.stocks>0){
-      updatePlayer(ai, dummy);
-      updatePlayer(dummy, ai);
-      updateProjectiles();
-      ticks++;
-    }
-    AI_PROFILE = {shield:ai.learn.shield, jump:ai.learn.jump, attack:ai.learn.attack, grab:ai.learn.grab, samples:ai.learn.samples, matches:(AI_PROFILE.matches||0)+1};
-    completed++;
+  const dummyType = dummyTypes[Math.floor(Math.random()*dummyTypes.length)] || aiType;
+  const ai = createPlayer(1, 330, COLORS[0], aiType, true, KEY_BINDINGS.p1, aiLevel);
+  const dummy = createPlayer(2, 630, COLORS[1], dummyType, true, KEY_BINDINGS.p2, 5);
+  ai.stocks = 1; dummy.stocks = 1;
+  const savedPlayers = players, savedProjectiles = projectiles, savedTemp = tempPlatforms;
+  players = [ai, dummy]; projectiles = []; tempPlatforms = [];
+  let ticks = 0;
+  while(ticks < 500 && ai.stocks>0 && dummy.stocks>0){
+    updatePlayer(ai, dummy);
+    updatePlayer(dummy, ai);
+    updateProjectiles();
+    ticks++;
   }
-  saveAIProfile();
+  AI_PROFILE = {shield:ai.learn.shield, jump:ai.learn.jump, attack:ai.learn.attack, grab:ai.learn.grab, samples:ai.learn.samples, matches:(AI_PROFILE.matches||0)+1};
+  players = savedPlayers; projectiles = savedProjectiles; tempPlatforms = savedTemp;
+}
+
+// Training runs as a visible, paced sequence of small batches (not one
+// instant blocking call) so the progress — and the fact that the stats are
+// actually moving — is visible while it happens, not just a black box.
+let trainingRun = null;
+function startTrainingRun(totalTrials, aiType, aiLevel){
+  trainingMode = true;
+  trainingRun = { done:0, total: totalTrials, aiType, aiLevel, before: {...AI_PROFILE} };
+  document.getElementById('startTrainBtn').disabled = true;
+  document.getElementById('resetAIBtn').disabled = true;
+  trainingRunStep();
+}
+function trainingRunStep(){
+  if(!trainingRun) return;
+  const batchSize = 2; // small batch per tick so progress is visibly incremental
+  for(let i=0; i<batchSize && trainingRun.done<trainingRun.total; i++){
+    runSingleTrainingTrial(trainingRun.aiType, trainingRun.aiLevel);
+    trainingRun.done++;
+  }
+  document.getElementById('startTrainBtn').textContent = `特訓中... (${trainingRun.done}/${trainingRun.total})`;
+  document.getElementById('trainStats').innerHTML =
+    `<div><b>進行中:</b> ${trainingRun.done}/${trainingRun.total} 試行</div>
+     <div><b>観測サンプル数:</b> ${AI_PROFILE.samples} （ガード率 ${pct(AI_PROFILE.shield,AI_PROFILE.samples)}％ / ジャンプ率 ${pct(AI_PROFILE.jump,AI_PROFILE.samples)}％）</div>`;
+  if(trainingRun.done < trainingRun.total){
+    setTimeout(trainingRunStep, 45); // paced — visibly progresses over a couple seconds, not instant
+  } else {
+    finishTrainingRun();
+  }
+}
+function finishTrainingRun(){
   trainingMode = false;
   hitstop = 0; shake = 0; particles = [];
-  players = savedPlayers; projectiles = savedProjectiles; tempPlatforms = savedTemp;
-  return completed;
+  saveAIProfile();
+  const before = trainingRun.before, after = AI_PROFILE;
+  document.getElementById('trainStats').innerHTML =
+    `<div><b>特訓完了！</b></div>
+     <div>学習試行の累計: ${before.matches||0} → ${after.matches||0} 回</div>
+     <div>観測サンプル数: ${before.samples||0} → ${after.samples||0}</div>
+     <div>ガード率: ${pct(before.shield,before.samples)}％ → ${pct(after.shield,after.samples)}％</div>
+     <div>ジャンプ率: ${pct(before.jump,before.samples)}％ → ${pct(after.jump,after.samples)}％</div>
+     <div style="color:var(--dim); margin-top:6px;">CPUレベル7〜9で対戦する際、この数値が行動選択に反映されます。</div>`;
+  trainingRun = null;
+  document.getElementById('startTrainBtn').disabled = false;
+  document.getElementById('startTrainBtn').textContent = '特訓開始 (約100試行)';
+  document.getElementById('resetAIBtn').disabled = false;
 }
 
 document.getElementById('openTrainBtn').onclick = ()=>{ show('trainingScreen'); buildTrainUI(); };
 document.getElementById('closeTrainBtn').onclick = ()=>{ show('titleScreen'); };
 document.getElementById('startTrainBtn').onclick = ()=>{
-  const btn = document.getElementById('startTrainBtn');
-  btn.textContent = '特訓中...';
-  setTimeout(()=>{
-    const n = runTrainingSession(100, trainSelect.type, trainSelect.level);
-    btn.textContent = '特訓開始 (約100試行)';
-    buildTrainUI();
-  }, 30);
+  startTrainingRun(100, trainSelect.type, trainSelect.level);
 };
 document.getElementById('resetAIBtn').onclick = ()=>{
   AI_PROFILE = {shield:0, jump:0, attack:0, grab:0, samples:0, matches:0};
@@ -1136,6 +1218,9 @@ function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
     learn: isCPU ? {shield:AI_PROFILE.shield, jump:AI_PROFILE.jump, attack:AI_PROFILE.attack, grab:AI_PROFILE.grab, samples:AI_PROFILE.samples}
                  : {shield:0, jump:0, attack:0, grab:0, samples:0},
     motionDownFrames: 0, motionForwardWindow: 0,
+    motionFwdFrames: 0, motionDownWindow: 0,
+    prevDownHeld: false, lastDownPressFrame: -999, doubleDownReady: 0,
+    jabComboIndex: 0, jabComboWindow: 0,
     armMode: 0,
     tier: 0,
     enhanceMaterial: 0, reinforcedHitsLeft: 0,
@@ -1192,15 +1277,15 @@ function readInput(p, other){
 function aiInput(p, other){
   const lvl = Math.max(1, Math.min(9, p.cpuLevel||5));
 
-  // passive learning: sample the human opponent's behavior every frame, all
-  // match long. Only levels above 6 actually act on it (see learnWeight).
-  if(!other.isCPU){
-    p.learn.samples++;
-    if(other.isShielding) p.learn.shield++;
-    if(other.state==='jump' && other.stateTimer===0) p.learn.jump++;
-    if(other.attack && other.attack.timer===1) p.learn.attack++;
-    if(other.state==='grabbing' && other.stateTimer===0) p.learn.grab++;
-  }
+  // passive learning: sample the opponent's behavior every frame — during a
+  // real match that's the human, during a training trial that's the sparring
+  // dummy. (Previously this only tracked non-CPU opponents, which silently
+  // made training mode collect zero data — fixed.)
+  p.learn.samples++;
+  if(other.isShielding) p.learn.shield++;
+  if(other.state==='jump' && other.stateTimer===0) p.learn.jump++;
+  if(other.attack && other.attack.timer===1) p.learn.attack++;
+  if(other.state==='grabbing' && other.stateTimer===0) p.learn.grab++;
   const learnWeight = Math.max(0, (lvl-6)/3); // 0 up to lvl6, ramps to 1 at lvl9
   const enoughData = p.learn.samples > 90;
   const shieldFreq = enoughData ? p.learn.shield/p.learn.samples : 0;
@@ -1627,15 +1712,35 @@ function updatePlayer(p, other, dt){
     }
   }
 
-  // ---- MOTION INPUT TRACKING (down -> forward -> special = command move) ----
-  // Generic: works for any character whose data defines a `command` move.
+  // ---- MOTION INPUT TRACKING (for RONIN-style command moves) ----
+  // Generic: works for any character whose data defines these move keys.
+  const forwardHeldNow = (p.facing===1 && input.right) || (p.facing===-1 && input.left);
+
+  // pattern 1: down -> forward -> special = 'command'
   if(input.down){ p.motionDownFrames = 14; }
   else if(p.motionDownFrames > 0){ p.motionDownFrames--; }
-  if(p.motionDownFrames > 0 && ((p.facing===1 && input.right) || (p.facing===-1 && input.left))){
+  if(p.motionDownFrames > 0 && forwardHeldNow){
     p.motionForwardWindow = 16;
   } else if(p.motionForwardWindow > 0){
     p.motionForwardWindow--;
   }
+
+  // pattern 2: forward -> down -> special = 'command2' (reverse order of pattern 1)
+  if(forwardHeldNow){ p.motionFwdFrames = 14; }
+  else if(p.motionFwdFrames > 0){ p.motionFwdFrames--; }
+  if(p.motionFwdFrames > 0 && input.down){
+    p.motionDownWindow = 16;
+  } else if(p.motionDownWindow > 0){
+    p.motionDownWindow--;
+  }
+
+  // pattern 3: quick double-tap of down -> special = 'command3'
+  if(p.doubleDownReady > 0) p.doubleDownReady--;
+  if(input.down && !p.prevDownHeld){
+    if(p.frameCount - p.lastDownPressFrame < 20){ p.doubleDownReady = 18; }
+    p.lastDownPressFrame = p.frameCount;
+  }
+  p.prevDownHeld = input.down;
 
   // ---- MOVEMENT input (only in movement-eligible states) ----
   if(canMove(p) && p.state!=='attack'){
@@ -1681,9 +1786,15 @@ function updatePlayer(p, other, dt){
     if(input.specialPressed){
       let sKey = null;
       const forwardHeld = (p.facing===1 && input.right) || (p.facing===-1 && input.left);
-      if(p.charData.moves.command && p.motionForwardWindow > 0 && forwardHeld){
+      if(p.charData.moves.command3 && p.doubleDownReady > 0){
+        sKey = 'command3';
+        p.doubleDownReady = 0; p.motionForwardWindow = 0; p.motionDownWindow = 0;
+      } else if(p.charData.moves.command && p.motionForwardWindow > 0 && forwardHeld){
         sKey = 'command';
         p.motionForwardWindow = 0; p.motionDownFrames = 0;
+      } else if(p.charData.moves.command2 && p.motionDownWindow > 0 && input.down){
+        sKey = 'command2';
+        p.motionDownWindow = 0; p.motionFwdFrames = 0;
       } else if(input.aimUp){
         if(!p.recoveryUsed) sKey = 'uspecial';
       } else if(input.down){
@@ -1723,7 +1834,17 @@ function updatePlayer(p, other, dt){
         else if(input.down) moveKey = 'dtilt';
         else if(input.left || input.right || p.lastDir !== 0) moveKey = 'ftilt';
         else moveKey = 'jab';
-        executeMove(p, moveKey, getScaledMove(p, moveKey));
+        if(moveKey === 'jab' && p.charData.jabCombo){
+          // real multi-hit jab string: each character's combo differs in hit
+          // count, timing, and finisher — not just numbers on an identical move
+          const combo = p.charData.jabCombo;
+          const idx = Math.min(p.jabComboIndex||0, combo.length-1);
+          executeMove(p, 'jab', combo[idx]);
+          p.jabComboIndex = Math.min(idx+1, combo.length-1);
+          p.jabComboWindow = 24;
+        } else {
+          executeMove(p, moveKey, getScaledMove(p, moveKey));
+        }
         tickReinforcement(p, moveKey);
       }
     } else if(input.smashPressed && p.onGround){
@@ -1731,6 +1852,7 @@ function updatePlayer(p, other, dt){
       tickReinforcement(p, 'fsmash');
     }
   }
+  if(p.jabComboWindow > 0){ p.jabComboWindow--; if(p.jabComboWindow===0) p.jabComboIndex = 0; }
   if(p.state === 'attack') updateAttackHitbox(p, other);
 
   // ---- SHIELD ----
