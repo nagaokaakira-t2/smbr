@@ -215,6 +215,7 @@ const STAGE = {
   blast: {left:-140, right:W+140, top:-180, bottom:H+140},
 };
 const GRAVITY = 0.62, FALL_GRAVITY_MULT = 1.0, MAX_FALL = 13;
+const COBRA_MAX_CHARGE = 45; // frames to fully charge a chargeableArm special
 
 // ---------- CHARACTER DATA (data-driven move system) ----------
 // Each character: base stats + `moves` map. The engine reads these values
@@ -385,8 +386,8 @@ const CHARACTERS = {
     ]
   },
   cobra: {
-    label: 'COBRA', desc: '伸びる左右の腕で殴りつける、リーチの長い近接特化型（飛び道具は使わない）。下必殺技で右腕の武器を3種類（曲線軌道/重量級/標準）に切り替えられる。',
-    weight: 88, walkSpeed: 4.0, dashSpeed: 6.2, jumpPower: 12.0, size: 33, extraJumps: 1, cycleMode: 'dspecial',
+    label: 'COBRA', desc: '伸びる腕で殴りつける近接特化型（飛び道具は使わない）。特殊技はニュートラル入力（斜め下）／横入力（横）でホールドチャージ可能——長押しするほど最大距離まで腕が伸びる。下必殺技で腕の武器を3種類（曲線軌道/重量級/標準）に切り替え、両方向の攻撃に反映される。',
+    weight: 88, walkSpeed: 4.0, dashSpeed: 6.2, jumpPower: 12.0, size: 33, extraJumps: 1, cycleMode: 'dspecial', chargeableArm: true,
     moves: {
       jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4,  activeFrames:3, endLagFrames:8 },
       ftilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:40,h:18}, hitboxOffset:{x:30,y:-22}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
@@ -396,8 +397,8 @@ const CHARACTERS = {
       nair:   { damage:8, knockbackBase:4,   knockbackScaling:0.16, angle:44, hitboxSize:{w:50,h:50}, hitboxOffset:{x:0,y:-26},  startupFrames:5,  activeFrames:7, endLagFrames:12 },
       // arm-hook recovery: snaps straight to the ledge if in range (see recoveryType:'tether')
       uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.17, angle:85, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34}, startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:2, recoveryVy:12, recoveryType:'tether' },
-      // left arm: a long melee reach, not a flying projectile — the arm itself stretches out to hit
-      sspecial: { damage:8, knockbackBase:4, knockbackScaling:0.17, angle:20, hitboxSize:{w:26,h:18}, hitboxOffset:{x:78,y:-24}, startupFrames:11, activeFrames:4, endLagFrames:18, extendingArm:true },
+      // neutral/side specials are both handled dynamically by fireChargedArm()
+      // via nspecialModes below (chargeableArm:true) — no fixed nspecial/sspecial needed.
       dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.08, angle:30, hitboxSize:{w:24,h:24}, hitboxOffset:{x:0,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:10 },
     },
     jabCombo: [
@@ -405,11 +406,14 @@ const CHARACTERS = {
       { damage:4.6, knockbackBase:2, knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:6 },
       { damage:6.4, knockbackBase:4.8, knockbackScaling:0.17, angle:46, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:5, activeFrames:3, endLagFrames:16 },
     ],
-    // the three right-arm weapon modes nspecial cycles through via dspecial — all melee reach, not projectiles
+    // the three arm "weapon" modes, cycled via dspecial. maxReach is the full-
+    // charge distance; fireChargedArm() scales it by hold duration and builds
+    // the actual hitboxOffset at release time (diagonal-down for neutral input,
+    // straight-out for side input) — these entries have no fixed hitboxOffset.
     nspecialModes: [
-      { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, angle:24, hitboxSize:{w:30,h:22}, hitboxOffset:{x:88,y:-24}, startupFrames:10, activeFrames:3, endLagFrames:16, extendingArm:true },
-      { damage:14, knockbackBase:8,   knockbackScaling:0.26, angle:26, hitboxSize:{w:32,h:30}, hitboxOffset:{x:60,y:-24}, startupFrames:16, activeFrames:3, endLagFrames:24, extendingArm:true },
-      { damage:6,  knockbackBase:3,   knockbackScaling:0.15, angle:14, hitboxSize:{w:22,h:14}, hitboxOffset:{x:70,y:-22}, startupFrames:8,  activeFrames:2, endLagFrames:14, extendingArm:true },
+      { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, hitboxSize:{w:26,h:20}, startupFrames:8,  activeFrames:4, endLagFrames:16, maxReach:150, extendingArm:true },
+      { damage:15, knockbackBase:9,   knockbackScaling:0.28, hitboxSize:{w:32,h:28}, startupFrames:12, activeFrames:4, endLagFrames:22, maxReach:95,  extendingArm:true },
+      { damage:6,  knockbackBase:3,   knockbackScaling:0.15, hitboxSize:{w:20,h:14}, startupFrames:6,  activeFrames:3, endLagFrames:13, maxReach:120, extendingArm:true },
     ]
   },
   forge: {
@@ -1221,6 +1225,7 @@ function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
     motionFwdFrames: 0, motionDownWindow: 0,
     prevDownHeld: false, lastDownPressFrame: -999, doubleDownReady: 0,
     jabComboIndex: 0, jabComboWindow: 0,
+    specialHeldLastFrame: false, chargeFrames: 0, chargeDir: null,
     armMode: 0,
     tier: 0,
     enhanceMaterial: 0, reinforcedHitsLeft: 0,
@@ -1269,6 +1274,7 @@ function readInput(p, other){
     attackPressed: keysPressed.has(k.attack),
     smashPressed: keysPressed.has(k.smash),
     specialPressed: keysPressed.has(k.special),
+    specialHeld: keysDown.has(k.special),
     grabPressed: keysPressed.has(k.grab),
   };
 }
@@ -1295,7 +1301,7 @@ function aiInput(p, other){
   const dx = other.x - p.x;
   const dist = Math.abs(dx);
   const nearBlast = p.x < STAGE.blast.left+220 || p.x > STAGE.blast.right-220 || p.y < STAGE.blast.top+180;
-  const out = {left:false,right:false,up:false,upHeld:false,down:false,aimUp:false,dashHeld:false,shield:false,attackPressed:false,smashPressed:false,specialPressed:false,grabPressed:false};
+  const out = {left:false,right:false,up:false,upHeld:false,down:false,aimUp:false,dashHeld:false,shield:false,attackPressed:false,smashPressed:false,specialPressed:false,specialHeld:false,grabPressed:false};
 
   // priority: recover to stage if near blast zone and airborne
   if(nearBlast && !p.onGround){
@@ -1350,6 +1356,7 @@ function aiInput(p, other){
     if(!out.shield && Math.random()<0.3) out.up = true;
     if(dx>0) out.left = true; else out.right = true;
   }
+  out.specialHeld = out.specialPressed; // AI taps rather than holds to charge
   return out;
 }
 
@@ -1483,6 +1490,36 @@ function performRecovery(p, mv){
     p.helpless = true; p.recoveryUsed = true;
   }
   spawnParticles(p.x, p.y, p.color);
+}
+
+// Fires COBRA's charged arm. Reach scales with how long the special was held
+// (up to the mode's maxReach), with a floor so even a quick tap does something.
+// Direction shapes the trajectory: 'side' goes straight out, 'diagonal' (the
+// neutral-input version) angles down-and-out.
+function fireChargedArm(p, other){
+  const modes = p.charData.nspecialModes;
+  const mode = modes[p.armMode||0];
+  const frac = Math.max(0.35, Math.min(1, (p.chargeFrames||0)/COBRA_MAX_CHARGE));
+  const reach = (mode.maxReach||100) * frac;
+  let offsetX, offsetY, angle;
+  if(p.chargeDir === 'side'){
+    offsetX = reach; offsetY = -24; angle = 22;
+  } else {
+    const rad = 35*Math.PI/180;
+    offsetX = reach*Math.cos(rad);
+    offsetY = -10 + reach*Math.sin(rad);
+    angle = 18;
+  }
+  const built = {
+    ...mode,
+    damage: mode.damage*(0.8+0.2*frac),
+    knockbackBase: mode.knockbackBase*(0.8+0.2*frac),
+    hitboxOffset: {x:offsetX, y:offsetY},
+    angle,
+  };
+  const moveKey = p.chargeDir === 'side' ? 'sspecial' : 'nspecial';
+  executeMove(p, moveKey, built);
+  p.chargeFrames = 0; p.chargeDir = null;
 }
 
 // Consumes/arms FORGE's "reinforced" bonus. Each swing of a scalesWithTier
@@ -1650,6 +1687,8 @@ function doThrow(p, other, dir){
 function updatePlayer(p, other, dt){
   p.frameCount++;
   const input = readInput(p, other);
+  const specialReleased = p.specialHeldLastFrame && !input.specialHeld;
+  p.specialHeldLastFrame = input.specialHeld;
   if(p.invincible>0) p.invincible--;
 
   // ---- BURN (damage-over-time status, e.g. ASTRA's fire bolt) ----
@@ -1782,7 +1821,14 @@ function updatePlayer(p, other, dt){
   // move by held direction: aimUp->uspecial, down->dspecial, side->sspecial, none->nspecial.
   // Normal attacks (attack key) still pick jab/ftilt/utilt/dtilt on the ground, nair in the air.
   // Smash (smash key) is grounded-only, always fsmash.
-  if(canAct(p) && !p.isShielding && !p.helpless){
+  // chargeableArm characters (COBRA): neutral/side specials become hold-to-
+  // charge instead of firing instantly — see the 'charging' branch below.
+  if(p.charData.chargeableArm && p.state === 'charging'){
+    p.chargeFrames = Math.min((p.chargeFrames||0)+1, COBRA_MAX_CHARGE);
+    if(specialReleased || p.chargeFrames >= COBRA_MAX_CHARGE){
+      fireChargedArm(p, other);
+    }
+  } else if(canAct(p) && !p.isShielding && !p.helpless){
     if(input.specialPressed){
       let sKey = null;
       const forwardHeld = (p.facing===1 && input.right) || (p.facing===-1 && input.left);
@@ -1799,6 +1845,11 @@ function updatePlayer(p, other, dt){
         if(!p.recoveryUsed) sKey = 'uspecial';
       } else if(input.down){
         sKey = 'dspecial';
+      } else if(p.charData.chargeableArm){
+        // begin charging: neutral (diagonal-down) or side (horizontal), locked in at press time
+        p.chargeDir = (input.left || input.right || p.lastDir !== 0) ? 'side' : 'diagonal';
+        p.chargeFrames = 0;
+        setState(p, 'charging');
       } else if(input.left || input.right || p.lastDir !== 0){
         sKey = 'sspecial';
       } else {
@@ -2146,6 +2197,20 @@ function drawPlayer(p){
     CTX.fillStyle = 'rgba(120,220,255,0.22)';
     CTX.fill();
     CTX.strokeStyle = 'rgba(120,220,255,0.7)'; CTX.lineWidth=2; CTX.stroke();
+  }
+
+  // charging glow (COBRA's chargeableArm wind-up) — grows with hold duration
+  if(p.state === 'charging'){
+    const frac = Math.min(1, (p.chargeFrames||0)/COBRA_MAX_CHARGE);
+    const cx = p.chargeDir==='side' ? p.facing*22 : p.facing*16;
+    const cy = p.chargeDir==='side' ? -p.h*0.62 : -p.h*0.3;
+    CTX.save();
+    CTX.globalAlpha = 0.3 + 0.4*frac;
+    CTX.fillStyle = p.color;
+    CTX.beginPath();
+    CTX.arc(cx, cy, 5+11*frac, 0, Math.PI*2);
+    CTX.fill();
+    CTX.restore();
   }
 
   // body (flash white briefly on hit)
