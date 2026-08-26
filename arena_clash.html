@@ -386,7 +386,7 @@ const CHARACTERS = {
     ]
   },
   cobra: {
-    label: 'COBRA', desc: '伸びる腕で殴りつける近接特化型（飛び道具は使わない）。特殊技はニュートラル入力（斜め下）／横入力（横）でホールドチャージ可能——長押しするほど最大距離まで腕が伸びる。下必殺技で腕の武器を3種類（曲線軌道/重量級/標準）に切り替え、両方向の攻撃に反映される。',
+    label: 'COBRA', desc: '伸びる腕で殴りつける近接特化型（飛び道具は使わない）。特殊技はニュートラル入力（斜め下）／横入力（横）でホールドチャージ可能——移動やジャンプをしても溜めは消えず、離すと溜め具合に応じた距離まで腕が伸びる。溜め中・伸びている最中は上下入力で角度を微調整可能。下必殺技で腕の武器を3種類（曲線軌道/重量級/標準）に切り替え、両方向の攻撃に反映される。',
     weight: 88, walkSpeed: 4.0, dashSpeed: 6.2, jumpPower: 12.0, size: 33, extraJumps: 1, cycleMode: 'dspecial', chargeableArm: true,
     moves: {
       jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4,  activeFrames:3, endLagFrames:8 },
@@ -407,13 +407,14 @@ const CHARACTERS = {
       { damage:6.4, knockbackBase:4.8, knockbackScaling:0.17, angle:46, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:5, activeFrames:3, endLagFrames:16 },
     ],
     // the three arm "weapon" modes, cycled via dspecial. maxReach is the full-
-    // charge distance; fireChargedArm() scales it by hold duration and builds
-    // the actual hitboxOffset at release time (diagonal-down for neutral input,
-    // straight-out for side input) — these entries have no fixed hitboxOffset.
+    // charge distance (now ~1.8x longer per feedback); fireChargedArm()/
+    // getArmTipOffset() scale it by hold duration and build the live hit
+    // position dynamically (diagonal-down for neutral input, straight-out for
+    // side input, steerable via up/down while charging or while it's out).
     nspecialModes: [
-      { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, hitboxSize:{w:26,h:20}, startupFrames:8,  activeFrames:4, endLagFrames:16, maxReach:150, extendingArm:true },
-      { damage:15, knockbackBase:9,   knockbackScaling:0.28, hitboxSize:{w:32,h:28}, startupFrames:12, activeFrames:4, endLagFrames:22, maxReach:95,  extendingArm:true },
-      { damage:6,  knockbackBase:3,   knockbackScaling:0.15, hitboxSize:{w:20,h:14}, startupFrames:6,  activeFrames:3, endLagFrames:13, maxReach:120, extendingArm:true },
+      { damage:7,  knockbackBase:3.5, knockbackScaling:0.16, hitboxSize:{w:36,h:28}, startupFrames:8,  activeFrames:4, endLagFrames:16, maxReach:270, dynamicArm:true },
+      { damage:15, knockbackBase:9,   knockbackScaling:0.28, hitboxSize:{w:44,h:38}, startupFrames:12, activeFrames:4, endLagFrames:22, maxReach:170, dynamicArm:true },
+      { damage:6,  knockbackBase:3,   knockbackScaling:0.15, hitboxSize:{w:28,h:20}, startupFrames:6,  activeFrames:3, endLagFrames:13, maxReach:215, dynamicArm:true },
     ]
   },
   forge: {
@@ -1226,6 +1227,7 @@ function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
     prevDownHeld: false, lastDownPressFrame: -999, doubleDownReady: 0,
     jabComboIndex: 0, jabComboWindow: 0,
     specialHeldLastFrame: false, chargeFrames: 0, chargeDir: null,
+    isChargingArm: false, chargeAngleAdjust: 0, armReachFrac: 0, armDirType: null,
     armMode: 0,
     tier: 0,
     enhanceMaterial: 0, reinforcedHitsLeft: 0,
@@ -1495,27 +1497,21 @@ function performRecovery(p, mv){
 // Fires COBRA's charged arm. Reach scales with how long the special was held
 // (up to the mode's maxReach), with a floor so even a quick tap does something.
 // Direction shapes the trajectory: 'side' goes straight out, 'diagonal' (the
-// neutral-input version) angles down-and-out.
+// neutral-input version) angles down-and-out. The hit position stays dynamic
+// (see updateAttackHitbox's dynamicArm branch) so it tracks continued angle
+// steering and stays correct while the arm is extended.
 function fireChargedArm(p, other){
   const modes = p.charData.nspecialModes;
   const mode = modes[p.armMode||0];
   const frac = Math.max(0.35, Math.min(1, (p.chargeFrames||0)/COBRA_MAX_CHARGE));
-  const reach = (mode.maxReach||100) * frac;
-  let offsetX, offsetY, angle;
-  if(p.chargeDir === 'side'){
-    offsetX = reach; offsetY = -24; angle = 22;
-  } else {
-    const rad = 35*Math.PI/180;
-    offsetX = reach*Math.cos(rad);
-    offsetY = -10 + reach*Math.sin(rad);
-    angle = 18;
-  }
+  p.armReachFrac = frac;
+  p.armDirType = p.chargeDir;
   const built = {
     ...mode,
     damage: mode.damage*(0.8+0.2*frac),
     knockbackBase: mode.knockbackBase*(0.8+0.2*frac),
-    hitboxOffset: {x:offsetX, y:offsetY},
-    angle,
+    angle: p.chargeDir === 'side' ? 22 : 18,
+    dynamicArm: true,
   };
   const moveKey = p.chargeDir === 'side' ? 'sspecial' : 'nspecial';
   executeMove(p, moveKey, built);
@@ -1537,7 +1533,17 @@ function tickReinforcement(p, moveKey){
   }
 }
 
-function updateAttackHitbox(p, other){
+// Computes COBRA's current arm-tip offset from its dynamic charge state —
+// used both for hit detection and for rendering, so they always agree.
+function getArmTipOffset(p, move){
+  const baseAngle = p.armDirType === 'side' ? 0 : 35;
+  const angleDeg = baseAngle + (p.chargeAngleAdjust||0);
+  const rad = angleDeg*Math.PI/180;
+  const reach = (move.maxReach||100) * (p.armReachFrac||0.35);
+  return { x: reach*Math.cos(rad), y: -26 + reach*Math.sin(rad) };
+}
+
+function updateAttackHitbox(p, other, input){
   if(!p.attack) return;
   const a = p.attack;
   const move = a.move;
@@ -1564,6 +1570,12 @@ function updateAttackHitbox(p, other){
     a.placed = true;
   }
 
+  // continue steering the arm's angle while it's out (both before and after impact)
+  if(move.dynamicArm && input){
+    if(input.aimUp) p.chargeAngleAdjust = Math.max(-20, (p.chargeAngleAdjust||0) - 0.7);
+    if(input.down) p.chargeAngleAdjust = Math.min(20, (p.chargeAngleAdjust||0) + 0.7);
+  }
+
   // counter stance: active only during this move's active window, works
   // regardless of which side the incoming hit comes from
   p.countering = !!(move.counter && a.timer >= activeStart && a.timer < activeEnd);
@@ -1575,8 +1587,9 @@ function updateAttackHitbox(p, other){
       a.projSpawned = true;
     }
   } else if(a.timer >= activeStart && a.timer < activeEnd && !a.hit){
-    const hbX = p.x + p.facing * move.hitboxOffset.x;
-    const hbY = p.y + move.hitboxOffset.y;
+    const tip = move.dynamicArm ? getArmTipOffset(p, move) : move.hitboxOffset;
+    const hbX = p.x + p.facing * tip.x;
+    const hbY = p.y + tip.y;
     const hw = move.hitboxSize.w, hh = move.hitboxSize.h;
     if(rectOverlap(hbX-hw/2, hbY-hh/2, hw, hh, other.x-other.w/2, other.y-other.h, other.w, other.h) && other.invincible<=0){
       a.hit = true;
@@ -1821,14 +1834,21 @@ function updatePlayer(p, other, dt){
   // move by held direction: aimUp->uspecial, down->dspecial, side->sspecial, none->nspecial.
   // Normal attacks (attack key) still pick jab/ftilt/utilt/dtilt on the ground, nair in the air.
   // Smash (smash key) is grounded-only, always fsmash.
-  // chargeableArm characters (COBRA): neutral/side specials become hold-to-
-  // charge instead of firing instantly — see the 'charging' branch below.
-  if(p.charData.chargeableArm && p.state === 'charging'){
+  // chargeableArm characters (COBRA): neutral/side specials become hold-to-charge.
+  // This uses a flag (isChargingArm), NOT a state override, so the character's
+  // normal state (idle/walk/dash/jump/fall) is untouched — movement and
+  // jumping keep working normally while charging, they just can't start
+  // another attack/special/smash/shield/grab until the charge resolves.
+  if(p.charData.chargeableArm && p.isChargingArm){
     p.chargeFrames = Math.min((p.chargeFrames||0)+1, COBRA_MAX_CHARGE);
+    // steer the aim slightly up/down while charging
+    if(input.aimUp) p.chargeAngleAdjust = Math.max(-20, (p.chargeAngleAdjust||0) - 0.7);
+    if(input.down) p.chargeAngleAdjust = Math.min(20, (p.chargeAngleAdjust||0) + 0.7);
     if(specialReleased || p.chargeFrames >= COBRA_MAX_CHARGE){
       fireChargedArm(p, other);
+      p.isChargingArm = false;
     }
-  } else if(canAct(p) && !p.isShielding && !p.helpless){
+  } else if(canAct(p) && !p.isShielding && !p.helpless && !p.isChargingArm){
     if(input.specialPressed){
       let sKey = null;
       const forwardHeld = (p.facing===1 && input.right) || (p.facing===-1 && input.left);
@@ -1849,7 +1869,8 @@ function updatePlayer(p, other, dt){
         // begin charging: neutral (diagonal-down) or side (horizontal), locked in at press time
         p.chargeDir = (input.left || input.right || p.lastDir !== 0) ? 'side' : 'diagonal';
         p.chargeFrames = 0;
-        setState(p, 'charging');
+        p.chargeAngleAdjust = 0;
+        p.isChargingArm = true;
       } else if(input.left || input.right || p.lastDir !== 0){
         sKey = 'sspecial';
       } else {
@@ -1904,10 +1925,10 @@ function updatePlayer(p, other, dt){
     }
   }
   if(p.jabComboWindow > 0){ p.jabComboWindow--; if(p.jabComboWindow===0) p.jabComboIndex = 0; }
-  if(p.state === 'attack') updateAttackHitbox(p, other);
+  if(p.state === 'attack') updateAttackHitbox(p, other, input);
 
   // ---- SHIELD ----
-  if(input.shield && p.onGround && (canAct(p) || p.state==='shield')){
+  if(input.shield && p.onGround && !p.isChargingArm && (canAct(p) || p.state==='shield')){
     setState(p, 'shield');
     p.isShielding = true;
     p.vx *= 0.5;
@@ -1928,7 +1949,7 @@ function updatePlayer(p, other, dt){
   }
 
   // ---- DROP THROUGH PLATFORM (hold down on a droppable platform) ----
-  if(p.onGround && p.standingPlatform && p.standingPlatform.drop && input.down){
+  if(!p.isChargingArm && p.onGround && p.standingPlatform && p.standingPlatform.drop && input.down){
     p.dropHoldFrames = (p.dropHoldFrames||0) + 1;
     if(p.dropHoldFrames > 5){
       p.y += 8; p.onGround = false; p.standingPlatform = null; p.dropCooldown = 14;
@@ -1940,7 +1961,7 @@ function updatePlayer(p, other, dt){
   if(p.dropCooldown > 0) p.dropCooldown--;
 
   // ---- GRAB ----
-  if(input.grabPressed && canAct(p) && p.onGround && !p.isShielding){
+  if(input.grabPressed && canAct(p) && p.onGround && !p.isShielding && !p.isChargingArm){
     startGrab(p, other);
   }
 
@@ -2200,7 +2221,7 @@ function drawPlayer(p){
   }
 
   // charging glow (COBRA's chargeableArm wind-up) — grows with hold duration
-  if(p.state === 'charging'){
+  if(p.isChargingArm){
     const frac = Math.min(1, (p.chargeFrames||0)/COBRA_MAX_CHARGE);
     const cx = p.chargeDir==='side' ? p.facing*22 : p.facing*16;
     const cy = p.chargeDir==='side' ? -p.h*0.62 : -p.h*0.3;
@@ -2246,9 +2267,10 @@ function drawPlayer(p){
       }
     } else if(a.timer >= move.startupFrames && a.timer < move.startupFrames+move.activeFrames){
       const isSpecial = a.key==='uspecial'||a.key==='nspecial'||a.key==='sspecial'||a.key==='dspecial';
-      const hx = p.facing*move.hitboxOffset.x;
-      const hy = move.hitboxOffset.y;
-      if(move.extendingArm){
+      const tip = move.dynamicArm ? getArmTipOffset(p, move) : move.hitboxOffset;
+      const hx = p.facing*tip.x;
+      const hy = tip.y;
+      if(move.extendingArm || move.dynamicArm){
         // draw the stretched limb connecting the body to the hitbox tip
         CTX.strokeStyle = p.color; CTX.lineWidth = 8; CTX.lineCap = 'round';
         CTX.beginPath();
