@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEON ARENA — 乱闘ゲーム</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg: #0a0d18;
@@ -34,7 +32,7 @@
     position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
     gap:18px; z-index:5; text-align:center; padding:20px;
   }
-  #keyConfigScreen, #selectScreen{
+  #keyConfigScreen, #selectScreen, #trainingScreen{
     justify-content:flex-start; overflow-y:auto; padding-top:24px; padding-bottom:24px;
   }
   .hidden{ display:none !important; }
@@ -212,9 +210,64 @@ const STAGE = {
     {x:550, y:290, w:190, h:16, drop:true},
     {x:400, y:190, w:160, h:16, drop:true},
   ],
-  blast: {left:-140, right:W+140, top:-180, bottom:H+140},
+  // The floor/platforms stay the original compact size on purpose (that's
+  // the actual playable footprint). The blast zones are pushed out well
+  // beyond that, so the camera's zoom-out on big knockback (see render())
+  // reveals genuinely extra survivable space instead of just empty padding
+  // around a kill boundary that never moved.
+  blast: {left:-450, right:1410, top:-320, bottom:860},
 };
 const GRAVITY = 0.62, FALL_GRAVITY_MULT = 1.0, MAX_FALL = 13;
+
+// ---------- SOUND (synthesized, no external audio files needed) ----------
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    try { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){ return null; }
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  return audioCtx;
+}
+function playTone(freq, duration, type, volume){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type||'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume||0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+duration);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime+duration);
+  }catch(e){}
+}
+function playNoise(duration, volume){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  try{
+    const size = Math.max(1, Math.floor(ctx.sampleRate*duration));
+    const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<size;i++){ data[i] = (Math.random()*2-1) * (1 - i/size); }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.value = volume||0.2;
+    src.connect(gain); gain.connect(ctx.destination);
+    src.start();
+  }catch(e){}
+}
+function sfxHit(damage){
+  playNoise(0.07, Math.min(0.3, 0.14+damage*0.01));
+  playTone(160, 0.09, 'square', 0.09);
+}
+function sfxShieldHit(){ playTone(280, 0.09, 'sine', 0.08); }
+function sfxJump(){ playTone(520, 0.07, 'sine', 0.06); }
+function sfxLand(){ playTone(110, 0.05, 'sine', 0.05); }
+function sfxKO(){ playTone(220, 0.45, 'sawtooth', 0.14); }
+function sfxUI(){ playTone(680, 0.05, 'square', 0.05); }
+function sfxBreak(){ playNoise(0.15, 0.18); playTone(90, 0.15, 'square', 0.08); }
 const COBRA_MAX_CHARGE = 45; // frames to fully charge a chargeableArm special
 
 // ---------- CHARACTER DATA (data-driven move system) ----------
@@ -243,7 +296,13 @@ const CHARACTERS = {
       { damage:7, knockbackBase:4, knockbackScaling:0.16, angle:42, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:8, activeFrames:5, endLagFrames:14 },
       { damage:8, knockbackBase:4, knockbackScaling:0.16, angle:42, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:8, activeFrames:5, endLagFrames:12 },
       { damage:11.2, knockbackBase:9.6, knockbackScaling:0.21, angle:46, hitboxSize:{w:44,h:26}, hitboxOffset:{x:32,y:-32}, startupFrames:9, activeFrames:5, endLagFrames:22 },
-    ]
+    ],
+    throws: {
+      up:      { damage:10, knockbackBase:7, knockbackScaling:0.20, angle:80 },
+      down:    { damage:9,  knockbackBase:5, knockbackScaling:0.16, angle:-20 },
+      forward: { damage:11, knockbackBase:8, knockbackScaling:0.22, angle:25 },
+      back:    { damage:11, knockbackBase:9, knockbackScaling:0.24, angle:25 },
+    }
   },
   kitsune: {
     label: 'KITSUNE', desc: '軽量で技の発生が非常に速い。手数と連係で攻めるスタイルで、威力と吹っ飛びは控えめ。',
@@ -264,7 +323,13 @@ const CHARACTERS = {
       { damage:3, knockbackBase:1.6, knockbackScaling:0.1, angle:40, hitboxSize:{w:28,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:2, activeFrames:3, endLagFrames:6 },
       { damage:3.4, knockbackBase:1.6, knockbackScaling:0.1, angle:40, hitboxSize:{w:28,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:2, activeFrames:3, endLagFrames:4 },
       { damage:4.8, knockbackBase:3.8, knockbackScaling:0.13, angle:46, hitboxSize:{w:28,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:14 },
-    ]
+    ],
+    throws: {
+      up:      { damage:6, knockbackBase:3,   knockbackScaling:0.12, angle:82 },
+      down:    { damage:5, knockbackBase:2,   knockbackScaling:0.10, angle:-10 },
+      forward: { damage:6, knockbackBase:3.5, knockbackScaling:0.14, angle:25 },
+      back:    { damage:7, knockbackBase:4.5, knockbackScaling:0.16, angle:25 },
+    }
   },
   lancer: {
     label: 'LANCER', desc: '槍のように長いリーチが武器。差し合いと崖際の攻防が得意だが、スマッシュは大振りで隙が大きい。',
@@ -285,7 +350,13 @@ const CHARACTERS = {
       { damage:6, knockbackBase:3, knockbackScaling:0.16, angle:35, hitboxSize:{w:34,h:18}, hitboxOffset:{x:40,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:12 },
       { damage:6.9, knockbackBase:3, knockbackScaling:0.16, angle:35, hitboxSize:{w:34,h:18}, hitboxOffset:{x:40,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:10 },
       { damage:9.6, knockbackBase:7.2, knockbackScaling:0.21, angle:46, hitboxSize:{w:34,h:18}, hitboxOffset:{x:40,y:-24}, startupFrames:7, activeFrames:4, endLagFrames:20 },
-    ]
+    ],
+    throws: {
+      up:      { damage:7, knockbackBase:5,   knockbackScaling:0.15, angle:78 },
+      down:    { damage:7, knockbackBase:4,   knockbackScaling:0.14, angle:-15 },
+      forward: { damage:8, knockbackBase:6,   knockbackScaling:0.18, angle:22 },
+      back:    { damage:8, knockbackBase:6.5, knockbackScaling:0.19, angle:22 },
+    }
   },
   sylph: {
     label: 'SYLPH', desc: '空中ジャンプが1回多く非常に浮遊力が高い。地上技は控えめだが空中攻撃と上必殺技が強力。',
@@ -306,7 +377,13 @@ const CHARACTERS = {
       { damage:3, knockbackBase:1.4, knockbackScaling:0.1, angle:40, hitboxSize:{w:26,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:7 },
       { damage:3.4, knockbackBase:1.4, knockbackScaling:0.1, angle:40, hitboxSize:{w:26,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:5 },
       { damage:4.8, knockbackBase:3.4, knockbackScaling:0.13, angle:46, hitboxSize:{w:26,h:16}, hitboxOffset:{x:20,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:15 },
-    ]
+    ],
+    throws: {
+      up:      { damage:6, knockbackBase:3,   knockbackScaling:0.12, angle:85 },
+      down:    { damage:5, knockbackBase:2.5, knockbackScaling:0.11, angle:-12 },
+      forward: { damage:6, knockbackBase:3.5, knockbackScaling:0.14, angle:24 },
+      back:    { damage:6, knockbackBase:3.5, knockbackScaling:0.14, angle:24 },
+    }
   },
   volt: {
     label: 'VOLT', desc: '中距離からのエネルギー弾（ftilt / fsmash）でアウトレンジする遠距離特化型。接近されると近接技は控えめで打たれ弱い。',
@@ -334,16 +411,22 @@ const CHARACTERS = {
       { damage:4, knockbackBase:2, knockbackScaling:0.14, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:5, activeFrames:4, endLagFrames:11 },
       { damage:4.6, knockbackBase:2, knockbackScaling:0.14, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:5, activeFrames:4, endLagFrames:9 },
       { damage:6.4, knockbackBase:4.8, knockbackScaling:0.18, angle:46, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:6, activeFrames:4, endLagFrames:19 },
-    ]
+    ],
+    throws: {
+      up:      { damage:7, knockbackBase:4,   knockbackScaling:0.15, angle:80 },
+      down:    { damage:6, knockbackBase:3.5, knockbackScaling:0.13, angle:-10 },
+      forward: { damage:8, knockbackBase:7,   knockbackScaling:0.20, angle:18 },
+      back:    { damage:8, knockbackBase:7,   knockbackScaling:0.20, angle:18 },
+    }
   },
   shinobi: {
     label: 'SHINOBI', desc: '通常技の吹っ飛びが極端に小さく、連続ヒットで手数を稼ぐコンボ特化型。fsmashだけは高威力・高吹っ飛びの締め技。',
     weight: 85, walkSpeed: 4.4, dashSpeed: 6.8, jumpPower: 12.6, size: 31, extraJumps: 1,
     moves: {
-      jab:    { damage:5, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:6 },
-      ftilt:  { damage:6, knockbackBase:1.6, knockbackScaling:0.08, angle:18, hitboxSize:{w:36,h:16}, hitboxOffset:{x:26,y:-20}, startupFrames:4, activeFrames:4, endLagFrames:8 },
-      utilt:  { damage:6, knockbackBase:1.8, knockbackScaling:0.09, angle:85, hitboxSize:{w:26,h:32}, hitboxOffset:{x:10,y:-42}, startupFrames:4, activeFrames:4, endLagFrames:8 },
-      dtilt:  { damage:5, knockbackBase:1.5, knockbackScaling:0.07, angle:12, hitboxSize:{w:32,h:10}, hitboxOffset:{x:22,y:-6},  startupFrames:4, activeFrames:4, endLagFrames:8 },
+      jab:    { damage:5, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:6, minHitstun:16 },
+      ftilt:  { damage:6, knockbackBase:1.6, knockbackScaling:0.08, angle:18, hitboxSize:{w:36,h:16}, hitboxOffset:{x:26,y:-20}, startupFrames:4, activeFrames:4, endLagFrames:8, minHitstun:17 },
+      utilt:  { damage:6, knockbackBase:1.8, knockbackScaling:0.09, angle:85, hitboxSize:{w:26,h:32}, hitboxOffset:{x:10,y:-42}, startupFrames:4, activeFrames:4, endLagFrames:8, minHitstun:17 },
+      dtilt:  { damage:5, knockbackBase:1.5, knockbackScaling:0.07, angle:12, hitboxSize:{w:32,h:10}, hitboxOffset:{x:22,y:-6},  startupFrames:4, activeFrames:4, endLagFrames:8, minHitstun:16 },
       fsmash: { damage:18, knockbackBase:10, knockbackScaling:0.30, angle:30, hitboxSize:{w:50,h:20}, hitboxOffset:{x:34,y:-22}, startupFrames:12, activeFrames:5, endLagFrames:22 },
       nair:   { damage:8, knockbackBase:3.5, knockbackScaling:0.15, angle:45, hitboxSize:{w:44,h:44}, hitboxOffset:{x:0,y:-24},  startupFrames:5, activeFrames:8, endLagFrames:11 },
       uspecial:    { damage:7, knockbackBase:3.5, knockbackScaling:0.15, angle:75, hitboxSize:{w:30,h:30}, hitboxOffset:{x:0,y:-30},  startupFrames:4, activeFrames:7, endLagFrames:8, recoveryVx:3.4, recoveryVy:14 },
@@ -352,13 +435,19 @@ const CHARACTERS = {
       dspecial: { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:-70, hitboxSize:{w:34,h:14}, hitboxOffset:{x:20,y:-4},  startupFrames:6, activeFrames:5, endLagFrames:11 },
     },
     jabCombo: [
-      { damage:5, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:6 },
-      { damage:5.8, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:4 },
+      { damage:5, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:6, minHitstun:16 },
+      { damage:5.8, knockbackBase:1.2, knockbackScaling:0.06, angle:35, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:3, activeFrames:3, endLagFrames:4, minHitstun:16 },
       { damage:8, knockbackBase:2.9, knockbackScaling:0.08, angle:46, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:14 },
-    ]
+    ],
+    throws: {
+      up:      { damage:6, knockbackBase:2,   knockbackScaling:0.09, angle:85, minHitstun:20 },
+      down:    { damage:5, knockbackBase:1.8, knockbackScaling:0.08, angle:-8, minHitstun:20 },
+      forward: { damage:6, knockbackBase:2.5, knockbackScaling:0.10, angle:25 },
+      back:    { damage:9, knockbackBase:6,   knockbackScaling:0.20, angle:25 },
+    }
   },
   ronin: {
-    label: 'RONIN', desc: '高威力の万能格闘家。ダメージ100%を超えると全ての技の吹っ飛びが上昇する「怒り」状態に。3種のコマンド技を持つ：しゃがみ→前+特殊技／前→しゃがみ+特殊技／しゃがみ2回連打+特殊技（渾身の昇り技）。',
+    label: 'RONIN', desc: '高威力の万能格闘家。ダメージ100%を超えると全ての技の吹っ飛びが上昇する「怒り」状態に。横特殊技は一定距離を突進する拳で、当てると受け身不可の痺れダウンを奪う。3種のコマンド技を持つ：しゃがみ→前+特殊技／前→しゃがみ+特殊技／しゃがみ2回連打+特殊技（当てると空中で相手を痺れさせる渾身の昇り技）。',
     weight: 108, walkSpeed: 3.7, dashSpeed: 5.8, jumpPower: 11.2, size: 36, extraJumps: 1, hasRage: true,
     moves: {
       jab:    { damage:6,  knockbackBase:3,   knockbackScaling:0.15, angle:38,  hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:6,  activeFrames:4, endLagFrames:12 },
@@ -369,7 +458,10 @@ const CHARACTERS = {
       nair:   { damage:10, knockbackBase:5,   knockbackScaling:0.18, angle:46,  hitboxSize:{w:48,h:48}, hitboxOffset:{x:0,y:-28},  startupFrames:6,  activeFrames:7, endLagFrames:14 },
       uspecial:    { damage:10, knockbackBase:6, knockbackScaling:0.18, angle:85, hitboxSize:{w:38,h:38}, hitboxOffset:{x:0,y:-38}, startupFrames:5, activeFrames:7, endLagFrames:10, recoveryVx:2.4, recoveryVy:13 },
       nspecial: { damage:9,  knockbackBase:5,   knockbackScaling:0.19, angle:40,  hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-26},  startupFrames:10, activeFrames:5, endLagFrames:16 },
-      sspecial: { damage:10, knockbackBase:5.5, knockbackScaling:0.20, angle:22,  hitboxSize:{w:42,h:20}, hitboxOffset:{x:32,y:-24}, startupFrames:8,  activeFrames:5, endLagFrames:15, dashBoost:6 },
+      // side special: charges forward at a constant speed for the whole
+      // startup+active window (a real fixed-distance dash, not a one-time
+      // impulse that decays) — a clean hit forces a hard, un-techable knockdown.
+      sspecial: { damage:10, knockbackBase:4,  knockbackScaling:0.14, angle:8,  hitboxSize:{w:42,h:20}, hitboxOffset:{x:32,y:-24}, startupFrames:8,  activeFrames:10, endLagFrames:15, fixedDashSpeed:9.5, paralyzeDown:true },
       dspecial: { damage:9,  knockbackBase:5,   knockbackScaling:0.19, angle:-65, hitboxSize:{w:40,h:18}, hitboxOffset:{x:26,y:-6},  startupFrames:8,  activeFrames:5, endLagFrames:15 },
       // command 1: down -> forward -> special. A hard reversal punch.
       command:  { damage:16, knockbackBase:9,  knockbackScaling:0.28, angle:24, hitboxSize:{w:50,h:24}, hitboxOffset:{x:40,y:-24}, startupFrames:9,  activeFrames:6, endLagFrames:20 },
@@ -377,13 +469,20 @@ const CHARACTERS = {
       command2: { damage:14, knockbackBase:8,  knockbackScaling:0.24, angle:15, hitboxSize:{w:56,h:20}, hitboxOffset:{x:42,y:-14}, startupFrames:10, activeFrames:6, endLagFrames:20 },
       // command 3: quick down, down -> special. An original "final gale" rising finisher — a
       // from-scratch reimagining, not a reproduction of any existing character's move.
-      command3: { damage:19, knockbackBase:13, knockbackScaling:0.30, angle:88, hitboxSize:{w:44,h:50}, hitboxOffset:{x:6,y:-56}, startupFrames:12, activeFrames:6, endLagFrames:24 },
+      // A clean hit suspends the target motionless in mid-air for a follow-up window.
+      command3: { damage:19, knockbackBase:13, knockbackScaling:0.30, angle:88, hitboxSize:{w:44,h:50}, hitboxOffset:{x:6,y:-56}, startupFrames:12, activeFrames:6, endLagFrames:24, airFreeze:true, airFreezeDuration:35 },
     },
     jabCombo: [
       { damage:6, knockbackBase:3, knockbackScaling:0.15, angle:38, hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:12 },
       { damage:6.9, knockbackBase:3, knockbackScaling:0.15, angle:38, hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:6, activeFrames:4, endLagFrames:10 },
       { damage:9.6, knockbackBase:7.2, knockbackScaling:0.2, angle:46, hitboxSize:{w:34,h:20}, hitboxOffset:{x:26,y:-24}, startupFrames:7, activeFrames:4, endLagFrames:20 },
-    ]
+    ],
+    throws: {
+      up:      { damage:9,  knockbackBase:6,   knockbackScaling:0.18, angle:80 },
+      down:    { damage:8,  knockbackBase:5,   knockbackScaling:0.16, angle:-15 },
+      forward: { damage:10, knockbackBase:7,   knockbackScaling:0.20, angle:24 },
+      back:    { damage:10, knockbackBase:8,   knockbackScaling:0.22, angle:24 },
+    }
   },
   cobra: {
     label: 'COBRA', desc: '伸びる腕で殴りつける近接特化型（飛び道具は使わない）。特殊技はニュートラル入力（斜め下）／横入力（横）でホールドチャージ可能——移動やジャンプをしても溜めは消えず、離すと溜め具合に応じた距離まで腕が伸びる。溜め中・伸びている最中は上下入力で角度を微調整可能。下必殺技で腕の武器を3種類（曲線軌道/重量級/標準）に切り替え、両方向の攻撃に反映される。',
@@ -395,8 +494,8 @@ const CHARACTERS = {
       dtilt:  { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:6,  hitboxSize:{w:46,h:12}, hitboxOffset:{x:32,y:-4},  startupFrames:6,  activeFrames:4, endLagFrames:12 },
       fsmash: { damage:16,knockbackBase:9,   knockbackScaling:0.28, angle:60, hitboxSize:{w:40,h:26}, hitboxOffset:{x:26,y:-46}, startupFrames:13, activeFrames:5, endLagFrames:24 },
       nair:   { damage:8, knockbackBase:4,   knockbackScaling:0.16, angle:44, hitboxSize:{w:50,h:50}, hitboxOffset:{x:0,y:-26},  startupFrames:5,  activeFrames:7, endLagFrames:12 },
-      // arm-hook recovery: snaps straight to the ledge if in range (see recoveryType:'tether')
-      uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.17, angle:85, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34}, startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:2, recoveryVy:12, recoveryType:'tether' },
+      // wire recovery: arm stretches upward toward the ledge — real reach-based grab (see recoveryType:'tether')
+      uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.17, angle:85, hitboxSize:{w:34,h:34}, hitboxOffset:{x:0,y:-34}, startupFrames:5, activeFrames:7, endLagFrames:9, recoveryVx:2, recoveryVy:12, recoveryType:'tether', tetherReach:260 },
       // neutral/side specials are both handled dynamically by fireChargedArm()
       // via nspecialModes below (chargeableArm:true) — no fixed nspecial/sspecial needed.
       dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.08, angle:30, hitboxSize:{w:24,h:24}, hitboxOffset:{x:0,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:10 },
@@ -406,6 +505,12 @@ const CHARACTERS = {
       { damage:4.6, knockbackBase:2, knockbackScaling:0.13, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:6 },
       { damage:6.4, knockbackBase:4.8, knockbackScaling:0.17, angle:46, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-20}, startupFrames:5, activeFrames:3, endLagFrames:16 },
     ],
+    throws: {
+      up:      { damage:7, knockbackBase:4.5, knockbackScaling:0.15, angle:82 },
+      down:    { damage:6, knockbackBase:3.5, knockbackScaling:0.13, angle:-12 },
+      forward: { damage:8, knockbackBase:5.5, knockbackScaling:0.17, angle:22 },
+      back:    { damage:8, knockbackBase:6,   knockbackScaling:0.18, angle:22 },
+    },
     // the three arm "weapon" modes, cycled via dspecial. maxReach is the full-
     // charge distance (now ~1.8x longer per feedback); fireChargedArm()/
     // getArmTipOffset() scale it by hold duration and build the live hit
@@ -418,7 +523,7 @@ const CHARACTERS = {
     ]
   },
   forge: {
-    label: 'FORGE', desc: '採掘(nspecial)で素材ランクを上げると、剣や斧を使う技の威力・発生速度・リーチが段階的に強化される。稀に手に入る強化素材で武具を「強化」できるが、使い続けると壊れる。下必殺技で足場を設置可能。',
+    label: 'FORGE', desc: '採掘(nspecial・地上)で素材ランクを上げると、剣や斧を使う技の威力・発生速度・リーチが段階的に強化される。地上でnspecialを長押しすると連続で採掘できる。空中でnspecialを使うとブロックを設置（在庫の中で一番良い素材を消費、グレードが高いほど頑丈、全方向が完全な壁）。下必殺技はTNTを設置し、時間か接触で爆発する。稀に手に入る強化素材で武具を「強化」できるが使い続けると壊れる。',
     weight: 92, walkSpeed: 3.9, dashSpeed: 5.6, jumpPower: 11.0, size: 35, extraJumps: 1,
     tierMultipliers: [0.7, 0.85, 1.0, 1.15, 1.35],
     moves: {
@@ -428,12 +533,21 @@ const CHARACTERS = {
       dtilt:  { damage:6, knockbackBase:3.5, knockbackScaling:0.15, angle:8,  hitboxSize:{w:44,h:12}, hitboxOffset:{x:30,y:-4},  startupFrames:7,  activeFrames:4, endLagFrames:14, scalesWithTier:true },
       fsmash: { damage:19,knockbackBase:11,  knockbackScaling:0.32, angle:27, hitboxSize:{w:54,h:26}, hitboxOffset:{x:40,y:-26}, startupFrames:15, activeFrames:5, endLagFrames:28, scalesWithTier:true },
       nair:   { damage:9, knockbackBase:4.5, knockbackScaling:0.18, angle:44, hitboxSize:{w:48,h:48}, hitboxOffset:{x:0,y:-26},  startupFrames:7,  activeFrames:7, endLagFrames:15, scalesWithTier:true },
-      // recovery also drops a temporary foothold beneath the character (see recoveryType:'platform')
-      uspecial:    { damage:7, knockbackBase:4, knockbackScaling:0.16, angle:70, hitboxSize:{w:40,h:30}, hitboxOffset:{x:0,y:-30}, startupFrames:5, activeFrames:8, endLagFrames:14, recoveryVx:3.2, recoveryVy:8, recoveryType:'platform' },
-      nspecial: { damage:3, knockbackBase:1.5, knockbackScaling:0.08, angle:40, hitboxSize:{w:26,h:26}, hitboxOffset:{x:20,y:-20}, startupFrames:10, activeFrames:4, endLagFrames:18, mineTier:true },
+      // recovery is a plain burst — building/TNT utility lives entirely on the specials below
+      uspecial:    { damage:8, knockbackBase:4.5, knockbackScaling:0.16, angle:75, hitboxSize:{w:40,h:30}, hitboxOffset:{x:0,y:-30}, startupFrames:5, activeFrames:8, endLagFrames:14, recoveryVx:3.6, recoveryVy:12 },
+      // grounded neutral special: mine (hold to keep mining without re-pressing)
+      nspecial: { damage:3, knockbackBase:1.5, knockbackScaling:0.08, angle:40, hitboxSize:{w:26,h:26}, hitboxOffset:{x:20,y:-20}, startupFrames:10, activeFrames:4, endLagFrames:18, mineTier:true, miningSpeedScales:true },
+      // airborne neutral special: place a block instead of mining
+      nspecialAir: { damage:4, knockbackBase:1.5, knockbackScaling:0.10, angle:30, hitboxSize:{w:30,h:20}, hitboxOffset:{x:0,y:-10}, startupFrames:12, activeFrames:3, endLagFrames:18, placesPlatform:true },
       sspecial: { damage:10, knockbackBase:6,  knockbackScaling:0.22, angle:18, hitboxSize:{w:46,h:24}, hitboxOffset:{x:34,y:-24}, startupFrames:10, activeFrames:6, endLagFrames:18, dashBoost:8 },
-      // down special: place a temporary standable platform instead of a bomb
-      dspecial: { damage:4, knockbackBase:1.5, knockbackScaling:0.10, angle:30, hitboxSize:{w:30,h:20}, hitboxOffset:{x:0,y:-10}, startupFrames:14, activeFrames:3, endLagFrames:20, placesPlatform:true },
+      // down special: TNT (always, grounded or airborne)
+      dspecial: { damage:2, knockbackBase:1, knockbackScaling:0.05, angle:20, hitboxSize:{w:20,h:20}, hitboxOffset:{x:20,y:-16}, startupFrames:12, activeFrames:3, endLagFrames:22, throwsTNT:true },
+    },
+    throws: {
+      up:      { damage:8, knockbackBase:5.5, knockbackScaling:0.17, angle:80 },
+      down:    { damage:7, knockbackBase:4.5, knockbackScaling:0.15, angle:-15 },
+      forward: { damage:9, knockbackBase:6.5, knockbackScaling:0.19, angle:24 },
+      back:    { damage:9, knockbackBase:7,   knockbackScaling:0.20, angle:24 },
     }
   },
   astra: {
@@ -456,6 +570,12 @@ const CHARACTERS = {
       { damage:4.6, knockbackBase:2, knockbackScaling:0.13, angle:36, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:4, activeFrames:3, endLagFrames:5 },
       { damage:6.4, knockbackBase:4.8, knockbackScaling:0.17, angle:46, hitboxSize:{w:28,h:16}, hitboxOffset:{x:22,y:-20}, startupFrames:5, activeFrames:3, endLagFrames:15 },
     ],
+    throws: {
+      up:      { damage:7, knockbackBase:4,   knockbackScaling:0.15, angle:82 },
+      down:    { damage:6, knockbackBase:3.5, knockbackScaling:0.13, angle:-10 },
+      forward: { damage:7, knockbackBase:5,   knockbackScaling:0.17, angle:23 },
+      back:    { damage:7, knockbackBase:5.5, knockbackScaling:0.18, angle:23 },
+    },
     // neutral special auto-cycles every cast: fire (burn DOT) -> ice (freeze, short range) -> thunder (instant strike, not a slow-traveling shot)
     nspecialModes: [
       { damage:5, knockbackBase:2,   knockbackScaling:0.12, angle:24, hitboxSize:{w:20,h:20}, hitboxOffset:{x:30,y:-24}, startupFrames:12, activeFrames:2, endLagFrames:18,
@@ -464,12 +584,181 @@ const CHARACTERS = {
         projectile:true, projectileSpeed:5, projectileLife:30, projectileSize:{w:16,h:16}, freezeFrames:50 },
       { damage:10, knockbackBase:5,   knockbackScaling:0.18, angle:16, hitboxSize:{w:70,h:14}, hitboxOffset:{x:52,y:-24}, startupFrames:6, activeFrames:3, endLagFrames:16 },
     ]
+  },
+  wrench: {
+    label: 'WRENCH', desc: 'ジャンプとファイアボールを武器にする万能マスコット系ヒーロー。バランスの取れた性能で、火の玉(nspecial)を軸に立ち回る。上必殺技はふわっと浮き上がる滞空型の復帰。',
+    weight: 85, walkSpeed: 4.0, dashSpeed: 6.0, jumpPower: 13.0, size: 32, extraJumps: 1,
+    moves: {
+      jab:    { damage:4, knockbackBase:2,   knockbackScaling:0.14, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:4, activeFrames:3, endLagFrames:8 },
+      ftilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.17, angle:26, hitboxSize:{w:40,h:18}, hitboxOffset:{x:30,y:-22}, startupFrames:6, activeFrames:4, endLagFrames:12 },
+      utilt:  { damage:7, knockbackBase:3.5, knockbackScaling:0.16, angle:84, hitboxSize:{w:28,h:38}, hitboxOffset:{x:12,y:-48}, startupFrames:6, activeFrames:4, endLagFrames:12 },
+      dtilt:  { damage:6, knockbackBase:3,   knockbackScaling:0.14, angle:14, hitboxSize:{w:40,h:14}, hitboxOffset:{x:28,y:-6},  startupFrames:5, activeFrames:4, endLagFrames:11 },
+      fsmash: { damage:18, knockbackBase:10, knockbackScaling:0.30, angle:28, hitboxSize:{w:50,h:26}, hitboxOffset:{x:38,y:-26}, startupFrames:13, activeFrames:5, endLagFrames:24 },
+      nair:   { damage:9, knockbackBase:4.5, knockbackScaling:0.17, angle:44, hitboxSize:{w:48,h:48}, hitboxOffset:{x:0,y:-26}, startupFrames:6, activeFrames:7, endLagFrames:13 },
+      // floaty rising recovery — a cape-flutter-style glide, not an instant burst
+      uspecial:    { damage:8, knockbackBase:4, knockbackScaling:0.16, angle:80, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-36}, startupFrames:5, activeFrames:9, endLagFrames:11, recoveryVx:3.59, recoveryVy:16, recoveryType:'glide' },
+      // signature projectile — arcs and falls under gravity, not a flat straight shot
+      nspecial: { damage:7, knockbackBase:4, knockbackScaling:0.17, angle:22, hitboxSize:{w:18,h:18}, hitboxOffset:{x:30,y:-22}, startupFrames:11, activeFrames:2, endLagFrames:20,
+                  projectile:true, projectileSpeed:8, projectileLife:65, projectileSize:{w:18,h:18}, projectileGravity:true },
+      sspecial: { damage:9, knockbackBase:5, knockbackScaling:0.19, angle:24, hitboxSize:{w:44,h:22}, hitboxOffset:{x:34,y:-24}, startupFrames:8, activeFrames:5, endLagFrames:16, dashBoost:7 },
+      dspecial: { damage:12, knockbackBase:6.5, knockbackScaling:0.24, angle:-70, hitboxSize:{w:44,h:22}, hitboxOffset:{x:0,y:-4}, startupFrames:12, activeFrames:5, endLagFrames:20 },
+    },
+    jabCombo: [
+      { damage:4, knockbackBase:2, knockbackScaling:0.14, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:4, activeFrames:3, endLagFrames:8 },
+      { damage:4.6, knockbackBase:2, knockbackScaling:0.14, angle:38, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:4, activeFrames:3, endLagFrames:6 },
+      { damage:6.4, knockbackBase:4.8, knockbackScaling:0.19, angle:46, hitboxSize:{w:30,h:18}, hitboxOffset:{x:22,y:-22}, startupFrames:5, activeFrames:3, endLagFrames:16 },
+    ],
+    throws: {
+      up:      { damage:7, knockbackBase:4,   knockbackScaling:0.15, angle:82 },
+      down:    { damage:6, knockbackBase:3.5, knockbackScaling:0.13, angle:-12 },
+      forward: { damage:7, knockbackBase:5,   knockbackScaling:0.17, angle:23 },
+      back:    { damage:7, knockbackBase:5.5, knockbackScaling:0.18, angle:23 },
+    }
+  },
+  void: {
+    label: 'VOID', desc: '低吹っ飛びの技を極限まで繋げる「即死コンボ」特化型。単発の技はどれも弱いが、正しく繋げれば低ダメージからでも撃墜まで持っていける危険な連携を持つ。fsmashだけが唯一の大きな締め技で、リターンは大きいが差し合いは苦手。',
+    weight: 95, walkSpeed: 3.6, dashSpeed: 5.4, jumpPower: 11.6, size: 34, extraJumps: 1,
+    moves: {
+      jab:    { damage:4, knockbackBase:0.8, knockbackScaling:0.04, angle:35, hitboxSize:{w:30,h:18}, hitboxOffset:{x:24,y:-22}, startupFrames:4, activeFrames:3, endLagFrames:8, minHitstun:16 },
+      ftilt:  { damage:5, knockbackBase:1,   knockbackScaling:0.05, angle:20, hitboxSize:{w:38,h:16}, hitboxOffset:{x:30,y:-20}, startupFrames:5, activeFrames:4, endLagFrames:10, minHitstun:17 },
+      utilt:  { damage:6, knockbackBase:1.2, knockbackScaling:0.05, angle:86, hitboxSize:{w:28,h:36}, hitboxOffset:{x:12,y:-46}, startupFrames:5, activeFrames:4, endLagFrames:10, minHitstun:20 },
+      dtilt:  { damage:5, knockbackBase:1,   knockbackScaling:0.04, angle:25, hitboxSize:{w:36,h:12}, hitboxOffset:{x:26,y:-6},  startupFrames:5, activeFrames:4, endLagFrames:10, minHitstun:18 },
+      fsmash: { damage:24, knockbackBase:15, knockbackScaling:0.38, angle:32, hitboxSize:{w:54,h:26}, hitboxOffset:{x:40,y:-26}, startupFrames:16, activeFrames:6, endLagFrames:28 },
+      nair:   { damage:7, knockbackBase:1.5, knockbackScaling:0.06, angle:50, hitboxSize:{w:46,h:46}, hitboxOffset:{x:0,y:-26}, startupFrames:6, activeFrames:8, endLagFrames:14, minHitstun:18 },
+      uspecial:    { damage:9, knockbackBase:5, knockbackScaling:0.18, angle:85, hitboxSize:{w:36,h:36}, hitboxOffset:{x:0,y:-36}, startupFrames:5, activeFrames:7, endLagFrames:10, recoveryVx:3.4, recoveryVy:14 },
+      nspecial: { damage:6, knockbackBase:1,   knockbackScaling:0.05, angle:80, hitboxSize:{w:34,h:34}, hitboxOffset:{x:24,y:-16}, startupFrames:12, activeFrames:4, endLagFrames:20, minHitstun:22 },
+      sspecial: { damage:6, knockbackBase:1.2, knockbackScaling:0.05, angle:20, hitboxSize:{w:40,h:18}, hitboxOffset:{x:30,y:-20}, startupFrames:8, activeFrames:5, endLagFrames:16, dashBoost:7, minHitstun:16 },
+      dspecial: { damage:7, knockbackBase:2,   knockbackScaling:0.08, angle:10, hitboxSize:{w:40,h:12}, hitboxOffset:{x:28,y:-4}, startupFrames:8, activeFrames:5, endLagFrames:15, minHitstun:14 },
+    },
+    jabCombo: [
+      { damage:4, knockbackBase:0.8, knockbackScaling:0.04, angle:35, hitboxSize:{w:30,h:18}, hitboxOffset:{x:24,y:-22}, startupFrames:4, activeFrames:3, endLagFrames:6, minHitstun:16 },
+      { damage:4.5, knockbackBase:0.8, knockbackScaling:0.04, angle:35, hitboxSize:{w:30,h:18}, hitboxOffset:{x:24,y:-22}, startupFrames:4, activeFrames:3, endLagFrames:5, minHitstun:16 },
+      { damage:6, knockbackBase:1.6, knockbackScaling:0.06, angle:40, hitboxSize:{w:30,h:18}, hitboxOffset:{x:24,y:-22}, startupFrames:5, activeFrames:3, endLagFrames:10, minHitstun:17 },
+    ],
+    throws: {
+      up:      { damage:6, knockbackBase:2,   knockbackScaling:0.08, angle:85, minHitstun:20 },
+      down:    { damage:5, knockbackBase:1.5, knockbackScaling:0.06, angle:10, minHitstun:22 },
+      forward: { damage:7, knockbackBase:4,   knockbackScaling:0.15, angle:22 },
+      back:    { damage:9, knockbackBase:7,   knockbackScaling:0.20, angle:24 },
+    }
   }
 };
-const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f','#ff5566','#5ee6c9','#c9a876','#6b7bff'];
+const COLORS = ['#4fe3ff','#ff4fd8','#ffcf4f','#7dff8a','#b48cff','#ff9a4f','#ff5566','#5ee6c9','#c9a876','#6b7bff','#3b82ff','#a855f7'];
 
 // Embedded character portraits (SVG markup) — no external files needed.
 const PORTRAITS = {
+  void: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-void" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#d6b3ff" stop-opacity="0.5"/>
+      <stop offset="55%" stop-color="#a855f7" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-void" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#d6b3ff"/>
+    </linearGradient>
+    <radialGradient id="abyss-void" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000000"/>
+      <stop offset="70%" stop-color="#1c1030"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0.4"/>
+    </radialGradient>
+    <filter id="glow-void" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-void)"/>
+  <g stroke-width="1" stroke="#a855f7" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-void)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#a855f7" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-void)">
+    <!-- swirling abyss core -->
+    <circle cx="120" cy="112" r="46" fill="url(#abyss-void)" stroke="#a855f7" stroke-width="3"/>
+    <path d="M120 66 Q150 90 138 118 Q126 146 96 138" fill="none" stroke="#a855f7" stroke-width="3" opacity="0.8"/>
+    <path d="M120 158 Q90 134 102 106 Q114 78 144 86" fill="none" stroke="#d6b3ff" stroke-width="2" opacity="0.6"/>
+    <!-- fracture cracks radiating out -->
+    <path d="M120 66 L108 44" stroke="#a855f7" stroke-width="2.5" opacity="0.7"/>
+    <path d="M166 112 L192 106" stroke="#a855f7" stroke-width="2.5" opacity="0.7"/>
+    <path d="M120 158 L128 182" stroke="#a855f7" stroke-width="2.5" opacity="0.7"/>
+    <path d="M74 112 L48 118" stroke="#a855f7" stroke-width="2.5" opacity="0.7"/>
+    <circle cx="120" cy="112" r="8" fill="#d6b3ff"/>
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#a855f7" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#a855f7">VOID</text>
+</svg>`,
+  wrench: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-wrench" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#8fb4ff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#3b82ff" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0d18" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="ring-wrench" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82ff"/>
+      <stop offset="100%" stop-color="#8fb4ff"/>
+    </linearGradient>
+    <filter id="glow-wrench" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="240" height="280" fill="#0a0d18"/>
+  <rect x="0" y="0" width="240" height="280" fill="url(#bg-wrench)"/>
+  <g stroke-width="1" stroke="#3b82ff" opacity="0.08">
+    <line x1="20" y1="0" x2="20" y2="220"/>
+    <line x1="50" y1="0" x2="50" y2="220"/>
+    <line x1="80" y1="0" x2="80" y2="220"/>
+    <line x1="110" y1="0" x2="110" y2="220"/>
+    <line x1="140" y1="0" x2="140" y2="220"/>
+    <line x1="170" y1="0" x2="170" y2="220"/>
+    <line x1="200" y1="0" x2="200" y2="220"/>
+    <line x1="230" y1="0" x2="230" y2="220"/>
+    <line x1="0" y1="20" x2="240" y2="20"/>
+    <line x1="0" y1="50" x2="240" y2="50"/>
+    <line x1="0" y1="80" x2="240" y2="80"/>
+    <line x1="0" y1="110" x2="240" y2="110"/>
+    <line x1="0" y1="140" x2="240" y2="140"/>
+    <line x1="0" y1="170" x2="240" y2="170"/>
+    <line x1="0" y1="200" x2="240" y2="200"/>
+  </g>
+  <circle cx="120" cy="118" r="92" fill="none" stroke="url(#ring-wrench)" stroke-width="3" opacity="0.85"/>
+  <circle cx="120" cy="118" r="98" fill="none" stroke="#3b82ff" stroke-width="1" opacity="0.3"/>
+  <g filter="url(#glow-wrench)">
+    <!-- cap silhouette -->
+    <path d="M70 118 Q70 78 120 78 Q170 78 170 118 Z" fill="#1c2440" stroke="#3b82ff" stroke-width="3"/>
+    <rect x="66" y="112" width="108" height="14" rx="6" fill="#1c2440" stroke="#3b82ff" stroke-width="3"/>
+    <!-- emblem: gear + flame -->
+    <circle cx="120" cy="98" r="16" fill="none" stroke="#3b82ff" stroke-width="4"/>
+    <circle cx="120" cy="98" r="6" fill="#3b82ff"/>
+    <path d="M120 82 L124 90 L116 90 Z" fill="#3b82ff"/>
+    <path d="M120 114 L124 106 L116 106 Z" fill="#3b82ff"/>
+    <path d="M104 98 L112 94 L112 102 Z" fill="#3b82ff"/>
+    <path d="M136 98 L128 94 L128 102 Z" fill="#3b82ff"/>
+    <!-- fireball flourish below -->
+    <path d="M100 150 Q120 130 140 150 Q150 168 120 180 Q90 168 100 150 Z" fill="#1c2440" stroke="#3b82ff" stroke-width="2.5"/>
+    <path d="M112 158 Q120 148 128 158 Q132 168 120 174 Q108 168 112 158 Z" fill="#3b82ff" opacity="0.8"/>
+  </g>
+  <rect x="14" y="228" width="212" height="38" rx="4" fill="rgba(10,13,24,0.75)" stroke="#3b82ff" stroke-width="1.2"/>
+  <text x="120" y="253" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="22" letter-spacing="3" fill="#3b82ff">WRENCH</text>
+</svg>`,
   golem: `<svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="bg-golem" cx="50%" cy="38%" r="70%">
@@ -1094,17 +1383,18 @@ function runSingleTrainingTrial(aiType, aiLevel){
   const ai = createPlayer(1, 330, COLORS[0], aiType, true, KEY_BINDINGS.p1, aiLevel);
   const dummy = createPlayer(2, 630, COLORS[1], dummyType, true, KEY_BINDINGS.p2, 5);
   ai.stocks = 1; dummy.stocks = 1;
-  const savedPlayers = players, savedProjectiles = projectiles, savedTemp = tempPlatforms;
-  players = [ai, dummy]; projectiles = []; tempPlatforms = [];
+  const savedPlayers = players, savedProjectiles = projectiles, savedTemp = tempPlatforms, savedTnts = tnts;
+  players = [ai, dummy]; projectiles = []; tempPlatforms = []; tnts = [];
   let ticks = 0;
   while(ticks < 500 && ai.stocks>0 && dummy.stocks>0){
     updatePlayer(ai, dummy);
     updatePlayer(dummy, ai);
     updateProjectiles();
+    updateTNTs();
     ticks++;
   }
   AI_PROFILE = {shield:ai.learn.shield, jump:ai.learn.jump, attack:ai.learn.attack, grab:ai.learn.grab, samples:ai.learn.samples, matches:(AI_PROFILE.matches||0)+1};
-  players = savedPlayers; projectiles = savedProjectiles; tempPlatforms = savedTemp;
+  players = savedPlayers; projectiles = savedProjectiles; tempPlatforms = savedTemp; tnts = savedTnts;
 }
 
 // Training runs as a visible, paced sequence of small batches (not one
@@ -1171,6 +1461,7 @@ let shake = 0;
 let particles = [];
 let projectiles = [];
 let tempPlatforms = []; // player-built platforms (FORGE), separate from the fixed stage layout
+let tnts = []; // FORGE's thrown TNT (falls, then explodes on fuse-out or impact)
 let matchTimer = 120*60; // frames, 2 min at 60fps
 let players = [];
 let select = {
@@ -1220,6 +1511,9 @@ function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
     ledge: false,
     respawnTimer: 0,
     aiTimer: 0, aiState:'approach', cpuLevel: cpuLevel||5,
+    aiChargeTarget: 0, usedBlockRecoveryThisFall: false, rangedMoves: null,
+    comboFollowupUsed: false, aiComboScript: null, lastOtherAttacking: false,
+    noTechWindow: false, airFreezeFrames: 0,
     learn: isCPU ? {shield:AI_PROFILE.shield, jump:AI_PROFILE.jump, attack:AI_PROFILE.attack, grab:AI_PROFILE.grab, samples:AI_PROFILE.samples}
                  : {shield:0, jump:0, attack:0, grab:0, samples:0},
     motionDownFrames: 0, motionForwardWindow: 0,
@@ -1231,6 +1525,7 @@ function createPlayer(id, x, color, type, isCPU, keys, cpuLevel){
     armMode: 0,
     tier: 0,
     enhanceMaterial: 0, reinforcedHitsLeft: 0,
+    materials: [0,0,0,0,0], equipGrade: 0, equipDurability: 0,
     dot: null,
     glideFramesLeft: 0, glideLift: 0,
     countering: false,
@@ -1247,6 +1542,7 @@ function resetMatch(){
   particles = [];
   projectiles = [];
   tempPlatforms = [];
+  tnts = [];
   hitstop = 0; shake = 0;
   document.getElementById('p2cpuTag').textContent = select.p2cpu ? '[CPU Lv.'+select.p2level+']' : '';
 }
@@ -1282,6 +1578,22 @@ function readInput(p, other){
 }
 
 // ---------- SIMPLE CPU AI (level 1-9, levels 7-9 adapt to the human's habits) ----------
+// Detects which of a character's moves are actual projectiles (works for
+// static moves and for nspecialModes-cycling characters like ASTRA), so the
+// AI can play a ranged/zoning game with characters built around it (VOLT,
+// ASTRA) instead of only ever walking into melee range.
+function getRangedMoves(charData){
+  const ranged = {};
+  ['jab','ftilt','utilt','dtilt','fsmash','nair'].forEach(k=>{
+    if(charData.moves[k] && charData.moves[k].projectile) ranged[k] = true;
+  });
+  if(charData.moves.nspecial && charData.moves.nspecial.projectile) ranged.nspecial = true;
+  if(charData.moves.sspecial && charData.moves.sspecial.projectile) ranged.sspecial = true;
+  if(charData.moves.dspecial && charData.moves.dspecial.projectile) ranged.dspecial = true;
+  if(charData.nspecialModes && charData.nspecialModes.some(m=>m.projectile)) ranged.nspecial = true;
+  return ranged;
+}
+
 function aiInput(p, other){
   const lvl = Math.max(1, Math.min(9, p.cpuLevel||5));
 
@@ -1302,25 +1614,129 @@ function aiInput(p, other){
   p.aiTimer--;
   const dx = other.x - p.x;
   const dist = Math.abs(dx);
-  const nearBlast = p.x < STAGE.blast.left+220 || p.x > STAGE.blast.right-220 || p.y < STAGE.blast.top+180;
+  const nearBlast = p.x < STAGE.blast.left+220 || p.x > STAGE.blast.right-220 || p.y < STAGE.blast.top+180 || p.y > STAGE.blast.bottom-260;
   const out = {left:false,right:false,up:false,upHeld:false,down:false,aimUp:false,dashHeld:false,shield:false,attackPressed:false,smashPressed:false,specialPressed:false,specialHeld:false,grabPressed:false};
 
-  // priority: recover to stage if near blast zone and airborne
-  if(nearBlast && !p.onGround){
-    const targetX = (STAGE.floor.x + STAGE.floor.w/2);
-    if(p.x < targetX) out.right = true; else out.left = true;
-    if(p.y > 150){ out.up = true; out.aimUp = true; out.specialPressed = true; }
+  // FIX: the AI never attempted to tech out of a knockdown, so it ate a full
+  // ~60-frame punish window on every single knockdown. Try to tech every
+  // frame while down, with reliability scaling by level.
+  if(p.state === 'down'){
+    if(Math.random() < 0.08 + lvl*0.02){ out.attackPressed = true; }
     return out;
   }
 
+  // FIX: the AI had no dedicated logic for the 'ledge' hanging state, so
+  // unless some unrelated aiState happened to set out.up that frame, it could
+  // hang on the ledge indefinitely instead of climbing back up.
+  if(p.state === 'ledge'){
+    if(Math.random() < 0.15 + lvl*0.03){ out.up = true; }
+    return out;
+  }
+
+  // Reactive defense: react to the opponent's hitbox actually becoming
+  // active, checked every single frame — not a periodic dice roll. This is
+  // what makes blocking read like a real reaction instead of random luck.
+  if(other.attack && other.attack.move && other.attack.timer === other.attack.move.startupFrames && p.onGround && !p.isShielding && !p.isChargingArm){
+    const reach = (other.attack.move.hitboxOffset ? Math.abs(other.attack.move.hitboxOffset.x) : 50)
+                + (other.attack.move.hitboxSize ? other.attack.move.hitboxSize.w/2 : 20) + p.w/2 + 15;
+    if(dist < reach){
+      const reactChance = 0.22 + lvl*0.07;
+      if(Math.random() < reactChance){
+        out.shield = true;
+        if(dx>0) out.left = true; else out.right = true; // face the incoming attack
+        return out;
+      }
+    }
+  }
+
+  // Whiff punish: the opponent's attack just ended (they're in endlag) while
+  // we're in range — capitalize immediately instead of waiting for the next
+  // scheduled decision tick.
+  if(p.lastOtherAttacking && !other.attack && dist < 90 && p.onGround){
+    if(Math.random() < 0.3 + lvl*0.06){
+      out.attackPressed = true;
+      if(dx>0) out.right = true; else out.left = true;
+      p.lastOtherAttacking = false;
+      return out;
+    }
+  }
+  p.lastOtherAttacking = !!other.attack;
+
+  // combo follow-up: once a minHitstun-flagged hit connects (SHINOBI/VOID's
+  // whole identity), immediately re-enter 'attack' instead of waiting out the
+  // normal decision interval — otherwise the AI never actually strings its
+  // own true combos together.
+  if(p.attack && p.attack.hit && p.attack.move && p.attack.move.minHitstun && !p.comboFollowupUsed){
+    p.aiTimer = 0; p.aiState = 'attack'; p.comboFollowupUsed = true;
+  }
+  if(!p.attack) p.comboFollowupUsed = false;
+
+  // RONIN: attempt the actual down->forward->special motion input every so
+  // often at close range, instead of never using its signature command moves.
+  if(p.aiComboScript){
+    const s = p.aiComboScript;
+    s.timer++;
+    if(s.step === 0){
+      out.down = true;
+      if(s.timer > 6){ s.step = 1; s.timer = 0; }
+    } else {
+      if(dx>0) out.right = true; else out.left = true;
+      if(s.timer > 2){ out.specialPressed = true; p.aiComboScript = null; }
+    }
+    return out;
+  }
+  if(p.charData.moves.command && p.onGround && Math.abs(other.x-p.x) < 90 && Math.random() < 0.015){
+    p.aiComboScript = { step:0, timer:0 };
+  }
+
+  // COBRA: actually hold the charge for a while instead of tap-releasing
+  // instantly (which produced almost no reach) — commit to a target hold
+  // length once charging starts, then release around that point.
+  if(p.charData.chargeableArm && p.isChargingArm){
+    if(!p.aiChargeTarget) p.aiChargeTarget = 14 + Math.floor(Math.random()*(20+lvl*2));
+    out.specialHeld = (p.chargeFrames||0) < p.aiChargeTarget;
+    if(!out.specialHeld) p.aiChargeTarget = 0;
+    return out;
+  }
+
+  // priority: recover to stage if near blast zone and airborne. Use jumps
+  // first, then the up-special once jumps are spent — mashing both special
+  // and jump every frame was unreliable, and aiming at stage-center (rather
+  // than the nearest ledge) often overshot or undershot the grab window.
+  // FORGE also gets a chance to drop a block underneath itself as an extra
+  // foothold before committing to its up-special.
+  if(nearBlast && !p.onGround){
+    const edgeL = STAGE.floor.x, edgeR = STAGE.floor.x + STAGE.floor.w;
+    const targetX = Math.abs(p.x-edgeL) < Math.abs(p.x-edgeR) ? edgeL+30 : edgeR-30;
+    if(p.x < targetX) out.right = true; else out.left = true;
+    out.dashHeld = true;
+    if(p.y > 60){
+      if(p.charData.tierMultipliers && !p.recoveryUsed && !p.usedBlockRecoveryThisFall && Math.random() < 0.4){
+        out.down = true; out.specialPressed = true; // dspecial: drop a block to catch the fall
+        p.usedBlockRecoveryThisFall = true;
+      } else if(p.jumpsLeft > 0){
+        out.up = true;
+      } else if(!p.recoveryUsed){
+        out.aimUp = true; out.specialPressed = true;
+      }
+    }
+    return out;
+  }
+  if(p.onGround) p.usedBlockRecoveryThisFall = false;
+
   if(p.aiTimer <= 0){
     // higher level = faster decision cycling (quicker reactions)
-    const baseInterval = Math.max(5, 26 - lvl*2);
+    const baseInterval = Math.max(4, 20 - lvl*1.8);
     p.aiTimer = baseInterval + Math.floor(Math.random()*baseInterval*0.6);
     const heavyDamage = p.damagePercent > 70;
-    const mistakeChance = Math.max(0, 0.42 - lvl*0.045); // sloppy at lvl1, sharp at lvl9
+    const mistakeChance = Math.max(0, 0.30 - lvl*0.032); // sloppy at lvl1, sharp at lvl9
     const r = Math.random();
+    const ranged = p.rangedMoves || (p.rangedMoves = getRangedMoves(p.charData));
+    const hasRanged = Object.keys(ranged).length > 0;
+    const canMine = p.charData.tierMultipliers && (p.tier||0) < p.charData.tierMultipliers.length-1;
     if(heavyDamage && r < (0.3 + lvl*0.02)) p.aiState = 'evade';
+    else if(canMine && p.onGround && dist > 140 && Math.random() < 0.35) p.aiState = 'mine';
+    else if(hasRanged && dist > 120 && dist < 480 && Math.random() < 0.55) p.aiState = 'zone';
     else if(dist < 70) p.aiState = 'attack';
     else p.aiState = 'approach';
     if(Math.random() < mistakeChance){
@@ -1330,9 +1746,34 @@ function aiInput(p, other){
   }
 
   if(p.aiState === 'approach'){
-    if(dx > 12){ out.right = true; out.dashHeld = lvl>=3; }
-    else if(dx < -12){ out.left = true; out.dashHeld = lvl>=3; }
+    if(dx > 12){ out.right = true; out.dashHeld = true; }
+    else if(dx < -12){ out.left = true; out.dashHeld = true; }
     if(other.y < p.y - 40 && p.onGround) out.up = true;
+    // floaty characters (extra jumps, low gravity) use their air mobility to
+    // close distance instead of just drifting — a real gap before this fix
+    if(!p.onGround && (p.charData.extraJumps||1) >= 2 && p.jumpsLeft > 0 && Math.random() < 0.05){
+      out.up = true;
+    }
+  } else if(p.aiState === 'mine'){
+    // FORGE: back off slightly and mine when it's not risky to do so
+    if(dx>0) out.left = true; else out.right = true;
+    out.specialPressed = true;
+  } else if(p.aiState === 'zone'){
+    // keep to a poking distance and throw whichever ranged option is available
+    const idealDist = 280;
+    if(dist < idealDist-40){ if(dx>0) out.left=true; else out.right=true; }
+    else if(dist > idealDist+80){ if(dx>0) out.right=true; else out.left=true; }
+    else { if(dx>0) out.right=true; else out.left=true; }
+    if(Math.random() < 0.3 + lvl*0.03){
+      const options = Object.keys(p.rangedMoves||{});
+      if(options.length){
+        const pick = options[Math.floor(Math.random()*options.length)];
+        if(pick==='nspecial' || pick==='sspecial') out.specialPressed = true;
+        else if(pick==='dspecial') { out.down = true; out.specialPressed = true; }
+        else if(pick==='fsmash') out.smashPressed = true;
+        else out.attackPressed = true;
+      }
+    }
   } else if(p.aiState === 'attack'){
     if(dist < 65){
       // learned habit: if the human shields a lot, favor grabbing instead of attacking into it
@@ -1341,24 +1782,25 @@ function aiInput(p, other){
         out.grabPressed = true;
       } else {
         const r = Math.random();
-        const skill = lvl*0.035; // higher level leans on smash/special more than plain jabs
-        out.attackPressed = r < Math.max(0.15, 0.4 - skill);
+        const skill = lvl*0.05; // higher level leans on smash/special more than plain jabs
+        out.attackPressed = r < Math.max(0.12, 0.38 - skill);
         out.smashPressed = !out.attackPressed && r < 0.4+skill*0.5;
-        out.specialPressed = !out.attackPressed && !out.smashPressed && r < 0.6+skill;
+        out.specialPressed = !out.attackPressed && !out.smashPressed && r < 0.62+skill;
         out.grabPressed = !out.attackPressed && !out.smashPressed && !out.specialPressed && Math.random() < 0.2;
       }
       if(dx>0) out.right = true; else out.left = true;
     } else {
+      out.dashHeld = true;
       if(dx>0) out.right = true; else out.left = true;
     }
   } else if(p.aiState === 'evade'){
     // learned habit: against a jump-happy human, lean on spacing/anti-air instead of pure shield
     const preferAntiAir = jumpFreq * learnWeight;
-    out.shield = Math.random() < (0.35 + lvl*0.03) && Math.random() > preferAntiAir*0.6;
+    out.shield = Math.random() < (0.45 + lvl*0.035) && Math.random() > preferAntiAir*0.6;
     if(!out.shield && Math.random()<0.3) out.up = true;
     if(dx>0) out.left = true; else out.right = true;
   }
-  out.specialHeld = out.specialPressed; // AI taps rather than holds to charge
+  out.specialHeld = out.specialPressed; // AI taps rather than holds to charge (except COBRA, handled above)
   return out;
 }
 
@@ -1377,6 +1819,7 @@ function resolveHit(target, attacker, angleDeg, kb, damage){
   hitstop = Math.min(14, 3 + Math.floor(damage/2));
   shake = Math.min(10, 2 + damage/3);
   spawnParticles(target.x, target.y - target.h/2, target.color);
+  sfxHit(damage);
 }
 
 // Used by grab throws (fixed, non-move-table knockback)
@@ -1395,6 +1838,12 @@ function applyMoveHit(target, attacker, move){
     kb *= 1.25;
   }
   resolveHit(target, attacker, move.angle || 40, kb, move.damage);
+  // minHitstun: guarantees a proper stun window even when knockback (and thus
+  // the normal kb-derived hitstun) is tiny — lets low-knockback combo moves
+  // (e.g. SHINOBI's kit) actually stay true instead of the target acting first
+  if(move.minHitstun && target.hitstunFrames < move.minHitstun){
+    target.hitstunFrames = move.minHitstun;
+  }
   // freeze/restrain: overrides the normal knockback-derived hitstun with a fixed duration
   if(move.freezeFrames){
     target.hitstunFrames = move.freezeFrames;
@@ -1403,6 +1852,21 @@ function applyMoveHit(target, attacker, move){
   // burn: a damage-over-time status that ticks independently of hitstun
   if(move.burnDamage){
     target.dot = { dmgPerTick: move.burnDamage, ticksLeft: move.burnTicks||3, tickTimer:0, tickEvery: move.burnInterval||20 };
+  }
+  // paralyze-down: forces a hard knockdown that can't be teched out of early
+  // (RONIN's dash punch) — the normal hitstun->landing->'down' flow still
+  // happens, this just disables the tech window once they're down.
+  if(move.paralyzeDown){
+    target.noTechWindow = true;
+  }
+  // air-freeze: suspends the target motionless in mid-air for a duration
+  // instead of letting them fly off and fall normally (RONIN's uppercut
+  // command move) — a real "stopped in place" effect, not just low knockback.
+  if(move.airFreeze){
+    const dur = move.airFreezeDuration || 30;
+    target.vx = 0; target.vy = 0;
+    target.airFreezeFrames = dur;
+    target.hitstunFrames = Math.max(target.hitstunFrames, dur+8);
   }
 }
 
@@ -1414,10 +1878,143 @@ function spawnParticles(x,y,color){
   }
 }
 
-// A player-built platform (FORGE). Lasts a while, then crumbles.
+const BLOCK_SIZE = 70;      // square block dimensions
+const BLOCK_HP_BASE = 25;   // base durability before grade multiplier
+const BLOCK_LIFESPAN = 720; // frames before it crumbles on its own (~12s)
+// Higher material grades are rarer but make tougher blocks when built.
+const BLOCK_GRADE_CHANCE = [0.40, 0.30, 0.17, 0.09, 0.04]; // wood..diamond-equivalent
+const BLOCK_GRADE_HP_MULT = [1.0, 1.3, 1.7, 2.2, 2.8];
+const BLOCK_GRADE_COLOR = ['#c9a876', '#9aa0a6', '#d8dee6', '#ffd54f', '#7de3ff'];
+// Equipment (mining tool) grade: faster mining at higher grade, but the tool
+// has its own durability and wears out with use — note grade 3 (gold-like)
+// is intentionally fragile despite being a high grade, same joke as the real
+// game this is riffing on.
+const EQUIP_MINE_SPEED_MULT = [1.0, 0.85, 0.72, 0.62, 0.52]; // multiplies nspecial startupFrames
+const EQUIP_DURABILITY =      [0,   10,   16,   6,    26  ]; // uses before it breaks (index 0 unused: bare hands never break)
+
+// Rolls a weighted-random material grade (0 = common/wood-like, 4 = rare/diamond-like).
+function rollMaterialGrade(){
+  let r = Math.random();
+  for(let i=0;i<BLOCK_GRADE_CHANCE.length;i++){
+    if(r < BLOCK_GRADE_CHANCE[i]) return i;
+    r -= BLOCK_GRADE_CHANCE[i];
+  }
+  return 0;
+}
+
+// Highest-grade material currently banked, or -1 if the inventory is empty.
+function pickBestMaterial(p){
+  for(let g=4; g>=0; g--){ if(p.materials[g] > 0) return g; }
+  return -1;
+}
+
+// Re-equips a fresh tool from banked materials, but only once the current one
+// has broken (durability <= 0) — otherwise a good find would instantly
+// cannibalize materials the player might have been saving for a block.
+function tryUpgradeEquip(p){
+  if(p.equipDurability > 0) return;
+  const grade = pickBestMaterial(p);
+  if(grade >= 1){
+    p.materials[grade]--;
+    p.equipGrade = grade;
+    p.equipDurability = EQUIP_DURABILITY[grade];
+    spawnParticles(p.x, p.y-p.h/2, BLOCK_GRADE_COLOR[grade]);
+  } else {
+    p.equipGrade = 0; p.equipDurability = 0; // bare hands
+  }
+}
+
+// nspecial's actual startup gets scaled by the current tool grade — this is
+// the "mining speed" the equipment grade affects. Returns the move unchanged
+// (safe to pass straight to executeMove) for any character without this flag.
+function getMiningScaledMove(p, moveKey){
+  const move = p.charData.moves[moveKey];
+  if(!move || !move.miningSpeedScales) return move;
+  const mult = EQUIP_MINE_SPEED_MULT[p.equipGrade||0];
+  return { ...move, startupFrames: Math.max(2, Math.round(move.startupFrames*mult)) };
+}
+
+// A player-built SOLID square block (FORGE). Blocks from all four sides (top,
+// bottom/ceiling, and both walls) and can't be dropped through by holding
+// down — a genuine wall/floor, not a one-way platform. Building one consumes
+// the best material currently banked (falls back to a free grade-0 block if
+// the inventory is empty, so the move is never a total whiff).
 function spawnTempPlatform(p){
-  tempPlatforms.push({ x: p.x-45, y: p.y, w:90, h:14, drop:true, life:900, owner:p });
+  let grade = pickBestMaterial(p);
+  if(grade >= 0){ p.materials[grade]--; } else { grade = 0; }
+  const maxHp = Math.round(BLOCK_HP_BASE * BLOCK_GRADE_HP_MULT[grade]);
+  tempPlatforms.push({
+    x: p.x-BLOCK_SIZE/2, y: p.y, w:BLOCK_SIZE, h:BLOCK_SIZE,
+    hp: maxHp, maxHp: maxHp, grade,
+    life: BLOCK_LIFESPAN, owner: p, solid: true, dead: false,
+  });
   spawnParticles(p.x, p.y, p.color);
+}
+
+// Damages any solid block overlapping the given area by `dmg`, once. Used by
+// both melee hitboxes and projectiles so blocks can be attacked/destroyed —
+// "breaks from attack or from time passing", per spec.
+function damageBlocksInArea(hbX, hbY, hw, hh, dmg){
+  for(const block of tempPlatforms){
+    if(block.solid && !block.dead && rectOverlap(hbX-hw/2, hbY-hh/2, hw, hh, block.x, block.y, block.w, block.h)){
+      block.hp -= dmg;
+      spawnParticles(block.x+block.w/2, block.y+block.h/2, '#c9a876');
+      if(block.hp <= 0){ block.dead = true; sfxBreak(); }
+      return true;
+    }
+  }
+  return false;
+}
+
+const TNT_FUSE = 75;    // frames before it auto-detonates
+const TNT_RADIUS = 95;  // explosion radius
+const TNT_DAMAGE = 17;
+
+// FORGE's down special: a fused explosive that falls under gravity and
+// detonates on fuse-out or on touching a player/block, dealing AOE damage.
+function spawnTNT(p){
+  tnts.push({
+    x: p.x + p.facing*22, y: p.y-30,
+    vx: p.facing*3.2, vy: -3,
+    fuse: TNT_FUSE, owner: p, exploded: false,
+  });
+  spawnParticles(p.x, p.y-30, '#ff9a4f');
+}
+
+function explodeTNT(t){
+  if(t.exploded) return;
+  t.exploded = true;
+  players.forEach(pl=>{
+    const d = Math.hypot(pl.x-t.x, pl.y-t.y);
+    if(d < TNT_RADIUS && pl.invincible<=0){
+      applyMoveHit(pl, t.owner, { damage: TNT_DAMAGE, knockbackBase:9, knockbackScaling:0.26, angle:55 });
+    }
+  });
+  damageBlocksInArea(t.x, t.y, TNT_RADIUS*2, TNT_RADIUS*2, 40);
+  hitstop = 10; shake = 10;
+  spawnParticles(t.x, t.y, '#ff9a4f');
+  spawnParticles(t.x, t.y, '#ff5566');
+  spawnParticles(t.x, t.y, '#ffffff');
+}
+
+function updateTNTs(){
+  tnts.forEach(t=>{
+    if(t.exploded) return;
+    t.vy += GRAVITY*0.9;
+    t.x += t.vx; t.y += t.vy;
+    t.vx *= 0.985;
+    // settle on the main floor
+    if(t.y >= STAGE.floor.y && t.x > STAGE.floor.x && t.x < STAGE.floor.x+STAGE.floor.w){
+      t.y = STAGE.floor.y; t.vy = 0; t.vx *= 0.7;
+    }
+    // detonate on touching either player
+    for(const pl of players){
+      if(Math.hypot(pl.x-t.x, pl.y-t.y) < 40){ explodeTNT(t); break; }
+    }
+    t.fuse--;
+    if(t.fuse <= 0) explodeTNT(t);
+  });
+  tnts = tnts.filter(t=>!t.exploded);
 }
 
 // ---------- GENERIC MOVE ENGINE ----------
@@ -1455,10 +2052,14 @@ function getScaledMove(p, moveKey){
 function performRecovery(p, mv){
   const rtype = mv.recoveryType || 'burst';
   if(rtype === 'tether'){
-    // arm-hook / grapple: snap straight onto the ledge if within range, otherwise a weak fallback burst
+    // wire recovery: the arm stretches upward toward the ledge — real 2D reach
+    // (not just horizontal), snaps onto the ledge if within tetherReach,
+    // otherwise the arm comes up short and it's a weak fallback burst.
     const edgeL = STAGE.floor.x, edgeR = STAGE.floor.x+STAGE.floor.w;
-    const distL = Math.abs(p.x-edgeL), distR = Math.abs(p.x-edgeR);
-    if(!p.onGround && Math.min(distL,distR) < 260 && p.y < STAGE.floor.y+80){
+    const distL = Math.hypot(edgeL-p.x, STAGE.floor.y-p.y);
+    const distR = Math.hypot(edgeR-p.x, STAGE.floor.y-p.y);
+    const reach = mv.tetherReach || 400;
+    if(!p.onGround && Math.min(distL,distR) < reach){
       const targetX = distL<distR ? edgeL : edgeR;
       p.x = targetX; p.y = STAGE.floor.y-4; p.vx=0; p.vy=0;
       setState(p,'ledge'); p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
@@ -1552,13 +2153,47 @@ function updateAttackHitbox(p, other, input){
   const activeEnd = activeStart + move.activeFrames;
   const total = activeEnd + move.endLagFrames;
 
+  // fixed-distance dash: constant velocity for the whole startup+active
+  // window (RONIN's side special), sharp stop once it ends — a predictable
+  // travel distance rather than a one-time impulse that decays unevenly.
+  if(move.fixedDashSpeed){
+    if(a.timer < activeEnd){
+      p.vx = p.facing*move.fixedDashSpeed;
+    } else if(a.timer === activeEnd){
+      p.vx = 0;
+    }
+  }
+
   if(move.mineTier && a.timer === activeStart && !a.mined){
     const maxTier = (p.charData.tierMultipliers ? p.charData.tierMultipliers.length : 1) - 1;
     p.tier = Math.min(maxTier, (p.tier||0)+1);
     a.mined = true;
     spawnParticles(p.x, p.y-p.h/2, p.color);
-    // chance of also finding a rare enhancement material while mining
-    if(Math.random() < 0.3){
+    // every mine attempt banks a material grade into real, consumable
+    // inventory — rarer grades are less likely but build tougher blocks and
+    // make better mining tools once equipped.
+    const grade = rollMaterialGrade();
+    p.materials[grade]++;
+    spawnParticles(p.x, p.y-p.h/2, BLOCK_GRADE_COLOR[grade]);
+    // if the current tool is broken (or bare-handed), auto-craft a new one
+    // from the best material now banked
+    tryUpgradeEquip(p);
+    // using the tool wears it down; once it breaks, mining reverts to bare-
+    // hand speed until materials are available to re-equip
+    if(p.equipGrade > 0){
+      p.equipDurability--;
+      if(p.equipDurability <= 0){
+        spawnParticles(p.x, p.y-p.h/2, '#ff5566');
+      }
+    }
+    // mining an actual placed block is more efficient: guaranteed material,
+    // and it damages the block (attacks — including this one — break blocks)
+    const mineX = p.x + p.facing*move.hitboxOffset.x, mineY = p.y + move.hitboxOffset.y;
+    const minedBlock = damageBlocksInArea(mineX, mineY, move.hitboxSize.w, move.hitboxSize.h, 15);
+    if(minedBlock){
+      p.enhanceMaterial = Math.min(3, (p.enhanceMaterial||0)+1);
+      spawnParticles(p.x, p.y-p.h/2, '#c9a876');
+    } else if(Math.random() < 0.3){
       p.enhanceMaterial = Math.min(3, (p.enhanceMaterial||0)+1);
       spawnParticles(p.x, p.y-p.h/2, '#c9a876');
     }
@@ -1568,6 +2203,12 @@ function updateAttackHitbox(p, other, input){
   if(move.placesPlatform && a.timer === activeStart && !a.placed){
     spawnTempPlatform(p);
     a.placed = true;
+  }
+
+  // FORGE: throws a fused TNT (down special)
+  if(move.throwsTNT && a.timer === activeStart && !a.thrown){
+    spawnTNT(p);
+    a.thrown = true;
   }
 
   // continue steering the arm's angle while it's out (both before and after impact)
@@ -1587,10 +2228,26 @@ function updateAttackHitbox(p, other, input){
       a.projSpawned = true;
     }
   } else if(a.timer >= activeStart && a.timer < activeEnd && !a.hit){
-    const tip = move.dynamicArm ? getArmTipOffset(p, move) : move.hitboxOffset;
-    const hbX = p.x + p.facing * tip.x;
-    const hbY = p.y + tip.y;
-    const hw = move.hitboxSize.w, hh = move.hitboxSize.h;
+    let hbX, hbY, hw, hh;
+    if(move.dynamicArm){
+      // the whole extended arm is a hitbox now, not just the fist at the tip —
+      // build an AABB spanning from the shoulder anchor to the tip, padded for width
+      const tip = getArmTipOffset(p, move);
+      const tipX = p.x + p.facing*tip.x, tipY = p.y + tip.y;
+      const anchorX = p.x + p.facing*8, anchorY = p.y - p.h*0.6;
+      const pad = 12;
+      const minX = Math.min(anchorX, tipX) - pad, maxX = Math.max(anchorX, tipX) + pad;
+      const minY = Math.min(anchorY, tipY) - pad, maxY = Math.max(anchorY, tipY) + pad;
+      hbX = (minX+maxX)/2; hbY = (minY+maxY)/2;
+      hw = maxX-minX; hh = maxY-minY;
+    } else {
+      hbX = p.x + p.facing * move.hitboxOffset.x;
+      hbY = p.y + move.hitboxOffset.y;
+      hw = move.hitboxSize.w; hh = move.hitboxSize.h;
+    }
+    if(!a.hitBlock && !move.mineTier){
+      a.hitBlock = damageBlocksInArea(hbX, hbY, hw, hh, move.damage);
+    }
     if(rectOverlap(hbX-hw/2, hbY-hh/2, hw, hh, other.x-other.w/2, other.y-other.h, other.w, other.h) && other.invincible<=0){
       a.hit = true;
       if(other.countering){
@@ -1604,11 +2261,13 @@ function updateAttackHitbox(p, other, input){
       } else if(other.isShielding){
         other.shieldHP -= move.damage*3.4;
         p.vx = -p.facing*2;
+        sfxShieldHit();
         if(other.shieldHP <= 0){
           other.shieldHP = 0;
           setState(other,'shieldbreak');
           other.isShielding = false;
           other.hitstunFrames = 180;
+          sfxBreak();
         }
         hitstop = 4; shake = 2;
       } else {
@@ -1632,14 +2291,20 @@ function spawnProjectile(p, move){
     w: size.w, h: size.h,
     life: move.projectileLife||70,
     owner: p, move, color: p.color, dead:false,
+    gravity: !!move.projectileGravity,
   });
 }
 
 function updateProjectiles(){
   const [pa,pb] = players;
   projectiles.forEach(pr=>{
+    if(pr.gravity) pr.vy += GRAVITY*0.55; // an arcing lob instead of a flat straight shot
     pr.x += pr.vx; pr.y += pr.vy; pr.life--;
     if(pr.dead) return;
+    if(damageBlocksInArea(pr.x, pr.y, pr.w, pr.h, pr.move.damage)){
+      pr.dead = true;
+      return;
+    }
     const target = pr.owner === pa ? pb : pa;
     if(target.invincible<=0 && rectOverlap(pr.x-pr.w/2, pr.y-pr.h/2, pr.w, pr.h, target.x-target.w/2, target.y-target.h, target.w, target.h)){
       if(target.countering){
@@ -1686,14 +2351,31 @@ function startGrab(p, other){
   }
 }
 
+// Fallback throws used only if a character doesn't define its own `throws`.
+const FALLBACK_THROWS = {
+  up:      { damage:8, knockbackBase:6, knockbackScaling:0.16, angle:80 },
+  down:    { damage:8, knockbackBase:6, knockbackScaling:0.16, angle:-15 },
+  forward: { damage:8, knockbackBase:6, knockbackScaling:0.16, angle:25 },
+  back:    { damage:8, knockbackBase:6, knockbackScaling:0.16, angle:25 },
+};
+
 function doThrow(p, other, dir){
-  const atk = {damage: 8, power: 6, baseKnockback: 3,
-    angle: dir==='up'?80: dir==='down'?-15: 25};
-  if(dir==='forward'){ atk.angle=25; }
-  if(dir==='back'){ p.facing*=-1; atk.angle=25; }
+  if(dir === 'back') p.facing *= -1;
+  const throwMove = (p.charData.throws && p.charData.throws[dir]) || FALLBACK_THROWS[dir];
   other.grabbedBy = null; p.grabbing = null;
-  applyKnockback(other, p, {...atk, damage:8});
+  applyMoveHit(other, p, throwMove);
   setState(p, 'idle');
+  // directional throw effect — a distinct burst per direction so up/down/
+  // forward/back throws visually read differently, not just in their numbers
+  const burstDir = dir==='up' ? {x:0,y:-1} : dir==='down' ? {x:0,y:1} : {x:p.facing, y:-0.15};
+  for(let i=0;i<10;i++){
+    const spread = (Math.random()-0.5)*2.4;
+    particles.push({
+      x: other.x, y: other.y-other.h/2,
+      vx: burstDir.x*4.5 + spread, vy: burstDir.y*4.5 + spread,
+      life: 20+Math.random()*8, color: other.color,
+    });
+  }
 }
 
 // ---------- MAIN PLAYER UPDATE ----------
@@ -1757,10 +2439,12 @@ function updatePlayer(p, other, dt){
   if(p.state === 'down'){
     p.stateTimer++;
     p.vx *= 0.85;
-    if((input.attackPressed || input.up) && p.stateTimer < 60){
+    const downDuration = p.noTechWindow ? 78 : 55;
+    if(!p.noTechWindow && (input.attackPressed || input.up) && p.stateTimer < 60){
       setState(p, 'idle');
-    } else if(p.stateTimer > 55){
+    } else if(p.stateTimer > downDuration){
       setState(p, 'idle');
+      p.noTechWindow = false;
     }
   }
 
@@ -1849,7 +2533,12 @@ function updatePlayer(p, other, dt){
       p.isChargingArm = false;
     }
   } else if(canAct(p) && !p.isShielding && !p.helpless && !p.isChargingArm){
-    if(input.specialPressed){
+    // FORGE: holding the special key while grounded (with no direction held)
+    // keeps mining continuously instead of needing repeated taps.
+    const wantsMineHold = p.charData.moves.nspecial && p.charData.moves.nspecial.mineTier
+      && input.specialHeld && p.onGround
+      && !input.down && !input.aimUp && !(input.left || input.right || p.lastDir !== 0);
+    if(input.specialPressed || wantsMineHold){
       let sKey = null;
       const forwardHeld = (p.facing===1 && input.right) || (p.facing===-1 && input.left);
       if(p.charData.moves.command3 && p.doubleDownReady > 0){
@@ -1876,11 +2565,17 @@ function updatePlayer(p, other, dt){
       } else {
         sKey = 'nspecial';
       }
+      // FORGE: neutral special places a block instead of mining when airborne
+      if(sKey === 'nspecial' && !p.onGround && p.charData.moves.nspecialAir){
+        sKey = 'nspecialAir';
+      }
       if(sKey){
         // nspecial mode-swap: stats come from the character's currently-selected
         // mode instead of a fixed move. cycleMode decides how the mode advances:
         // 'dspecial' = manual swap button, 'cast' = auto-advances every cast.
-        const modeMove = (sKey === 'nspecial' && p.charData.nspecialModes) ? p.charData.nspecialModes[p.armMode||0] : null;
+        const modeMove = (sKey === 'nspecial')
+          ? (p.charData.nspecialModes ? p.charData.nspecialModes[p.armMode||0] : getMiningScaledMove(p, 'nspecial'))
+          : null;
         executeMove(p, sKey, modeMove);
         const mv = modeMove || p.charData.moves[sKey];
         if(sKey === 'dspecial' && p.charData.nspecialModes && p.charData.cycleMode === 'dspecial'){
@@ -1942,9 +2637,11 @@ function updatePlayer(p, other, dt){
   if(input.up && canAct(p) && !p.isShielding){
     if(p.onGround){
       p.vy = -p.jumpPow; p.onGround = false; p.standingPlatform=null; setState(p,'jump'); p.jumpsLeft = p.maxJumps-1;
+      sfxJump();
     } else if(p.jumpsLeft > 0 && !p.helpless){
       p.vy = -p.jumpPow*0.92; p.jumpsLeft--; setState(p,'jump');
       spawnParticles(p.x, p.y, p.color);
+      sfxJump();
     }
   }
 
@@ -1968,10 +2665,13 @@ function updatePlayer(p, other, dt){
   // ---- LEDGE GRAB ----
   const edgeL = STAGE.floor.x, edgeR = STAGE.floor.x+STAGE.floor.w;
   if(!p.onGround && p.state!=='ledge' && p.vy>0){
-    if(Math.abs(p.x-edgeL)<20 && p.y > STAGE.floor.y-20 && p.y < STAGE.floor.y+30 && p.facing===-1){
-      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeL; p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
-    } else if(Math.abs(p.x-edgeR)<20 && p.y > STAGE.floor.y-20 && p.y < STAGE.floor.y+30 && p.facing===1){
-      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeR; p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
+    // Height window is now tight and centered on the stage's actual top
+    // surface (STAGE.floor.y) — you grab when you're passing roughly level
+    // with the ledge itself, not anywhere in a loose ±20/+30 band.
+    if(Math.abs(p.x-edgeL)<26 && p.y > STAGE.floor.y-15 && p.y < STAGE.floor.y+15){
+      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeL; p.facing=1; p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
+    } else if(Math.abs(p.x-edgeR)<26 && p.y > STAGE.floor.y-15 && p.y < STAGE.floor.y+15){
+      setState(p,'ledge'); p.vx=0; p.vy=0; p.x=edgeR; p.facing=-1; p.invincible=40; p.helpless=false; p.recoveryUsed=false; p.jumpsLeft=p.maxJumps;
     }
   }
   if(p.state==='ledge'){
@@ -1983,23 +2683,62 @@ function updatePlayer(p, other, dt){
 
   // ---- GRAVITY ----
   if(!p.onGround){
-    if(p.glideFramesLeft > 0){
-      p.vy -= p.glideLift;
-      if(p.vy < -10) p.vy = -10;
-      p.glideFramesLeft--;
+    if(p.airFreezeFrames > 0){
+      // suspended motionless mid-air (RONIN's uppercut command move) — no
+      // gravity, no drift, until the freeze duration runs out
+      p.airFreezeFrames--;
+      p.vx = 0; p.vy = 0;
+    } else {
+      if(p.glideFramesLeft > 0){
+        p.vy -= p.glideLift;
+        if(p.vy < -10) p.vy = -10;
+        p.glideFramesLeft--;
+      }
+      p.vy += GRAVITY * (p.charData.gravityMult||1);
+      if(p.vy > MAX_FALL) p.vy = MAX_FALL;
+      if(p.vy > 2 && p.state!=='attack' && p.state!=='hitstun' && p.state!=='helpless') setState(p,'fall');
     }
-    p.vy += GRAVITY * (p.charData.gravityMult||1);
-    if(p.vy > MAX_FALL) p.vy = MAX_FALL;
-    if(p.vy > 2 && p.state!=='attack' && p.state!=='hitstun' && p.state!=='helpless') setState(p,'fall');
   }
 
   // ---- INTEGRATE ----
   p.x += p.vx;
   p.y += p.vy;
 
+  // ---- CEILING COLLISION (solid FORGE blocks only — blocks jumping through from below) ----
+  if(p.vy < 0){
+    for(const block of tempPlatforms){
+      if(!block.solid) continue;
+      const headY = p.y - p.h;
+      const blockBottom = block.y + block.h;
+      const withinX = p.x + p.w/2 > block.x && p.x - p.w/2 < block.x + block.w;
+      if(withinX && headY <= blockBottom && headY - p.vy > blockBottom){
+        p.y = blockBottom + p.h;
+        p.vy = 0;
+        break;
+      }
+    }
+  }
+
+  // ---- WALL COLLISION (solid FORGE blocks — blocks horizontal movement through the sides) ----
+  if(p.vx !== 0){
+    for(const block of tempPlatforms){
+      if(!block.solid) continue;
+      const charTop = p.y - p.h, charBottom = p.y;
+      const withinY = charTop < block.y+block.h && charBottom > block.y;
+      if(!withinY) continue;
+      const prevX = p.x - p.vx;
+      if(p.vx > 0 && prevX + p.w/2 <= block.x && p.x + p.w/2 > block.x){
+        p.x = block.x - p.w/2; p.vx = 0; break;
+      } else if(p.vx < 0 && prevX - p.w/2 >= block.x+block.w && p.x - p.w/2 < block.x+block.w){
+        p.x = block.x+block.w + p.w/2; p.vx = 0; break;
+      }
+    }
+  }
+
   // ---- FLOOR / PLATFORM COLLISION ----
   let landed = false;
   const feet = p.y;
+  const fallSpeedBeforeLand = p.vy;
   if(p.vy >= 0){
     // main floor
     if(p.x > STAGE.floor.x-p.w/2 && p.x < STAGE.floor.x+STAGE.floor.w+p.w/2 && feet >= STAGE.floor.y && feet - p.vy <= STAGE.floor.y+2){
@@ -2019,6 +2758,7 @@ function updatePlayer(p, other, dt){
     p.jumpsLeft = p.maxJumps;
     p.helpless = false;
     p.recoveryUsed = false;
+    if(wasFalling && fallSpeedBeforeLand > 3) sfxLand();
     if(p.state==='hitstun' || (wasFalling && p.hitstunFrames>0)){
       p.hitstunFrames = 0;
       setState(p,'down');
@@ -2042,6 +2782,7 @@ function updatePlayer(p, other, dt){
 function loseStock(p){
   p.stocks--;
   spawnParticles(p.x, Math.max(60,Math.min(H-60,p.y)), p.color);
+  sfxKO();
   if(p.stocks <= 0){
     endMatch(p.id === 1 ? 2 : 1);
     return;
@@ -2072,11 +2813,12 @@ function updateMatch(){
   updatePlayer(a,b);
   updatePlayer(b,a);
   updateProjectiles();
+  updateTNTs();
 
   particles.forEach(pt=>{ pt.x+=pt.vx; pt.y+=pt.vy; pt.vy+=0.15; pt.life--; });
   particles = particles.filter(pt=>pt.life>0);
   tempPlatforms.forEach(pl=>pl.life--);
-  tempPlatforms = tempPlatforms.filter(pl=>pl.life>0);
+  tempPlatforms = tempPlatforms.filter(pl=>pl.life>0 && !pl.dead);
   if(shake>0) shake *= 0.85; if(shake<0.1) shake=0;
 
   keysPressed.clear();
@@ -2116,12 +2858,15 @@ function render(){
   if(gameState !== 'MATCH' && gameState !== 'RESULT'){ CTX.restore(); return; }
 
   // camera
+  // The stage is much bigger now, so this zooms out further than before when
+  // players are far apart (min 0.4 vs the old 0.72) — normal-distance play
+  // still renders at 1x, it only shrinks once separation grows.
   let camX=0, camY=0, zoom=1;
   if(players.length===2){
     const [a,b] = players;
     const midX = (a.x+b.x)/2, midY = (a.y+b.y)/2 - 60;
     const dist = Math.hypot(a.x-b.x, a.y-b.y);
-    zoom = Math.max(0.72, Math.min(1, 420/Math.max(300,dist)));
+    zoom = Math.max(0.4, Math.min(1, 420/Math.max(300,dist)));
     camX = W/2 - midX*zoom;
     camY = H/2 - midY*zoom;
   }
@@ -2156,15 +2901,31 @@ function render(){
     CTX.strokeRect(pl.x, pl.y, pl.w, pl.h);
   });
 
-  // player-built platforms (FORGE) — fade out as they near the end of their life
+  // player-built solid blocks (FORGE) — colored by material grade, fade out
+  // as they near the end of their life, plus a durability bar
   tempPlatforms.forEach(pl=>{
     const alpha = Math.min(1, pl.life/150);
+    const gradeColor = BLOCK_GRADE_COLOR[pl.grade||0];
     CTX.save();
     CTX.globalAlpha = alpha;
-    CTX.fillStyle = 'rgba(201,168,118,0.4)';
+    CTX.fillStyle = gradeColor + '8c'; // ~55% alpha hex
     CTX.fillRect(pl.x, pl.y, pl.w, pl.h);
-    CTX.strokeStyle = 'rgba(201,168,118,0.85)'; CTX.lineWidth=2;
+    // brick-ish cross lines for a "solid block" look
+    CTX.strokeStyle = 'rgba(0,0,0,0.35)'; CTX.lineWidth = 1;
+    CTX.beginPath();
+    CTX.moveTo(pl.x, pl.y+pl.h/2); CTX.lineTo(pl.x+pl.w, pl.y+pl.h/2);
+    CTX.moveTo(pl.x+pl.w/2, pl.y); CTX.lineTo(pl.x+pl.w/2, pl.y+pl.h);
+    CTX.stroke();
+    CTX.strokeStyle = gradeColor; CTX.lineWidth=2.5;
     CTX.strokeRect(pl.x, pl.y, pl.w, pl.h);
+    // durability bar
+    if(pl.maxHp){
+      const barW = pl.w, hpFrac = Math.max(0, pl.hp/pl.maxHp);
+      CTX.fillStyle = 'rgba(10,13,24,0.7)';
+      CTX.fillRect(pl.x, pl.y-8, barW, 5);
+      CTX.fillStyle = hpFrac > 0.4 ? '#7dff8a' : '#ff5566';
+      CTX.fillRect(pl.x, pl.y-8, barW*hpFrac, 5);
+    }
     CTX.restore();
   });
 
@@ -2174,6 +2935,21 @@ function render(){
     CTX.shadowColor = pr.color; CTX.shadowBlur = 12;
     CTX.fillStyle = pr.color;
     CTX.beginPath(); CTX.ellipse(pr.x, pr.y, pr.w/2, pr.h/2, 0, 0, Math.PI*2); CTX.fill();
+    CTX.restore();
+  });
+
+  // TNT (FORGE) — black body with a blinking fuse spark, faster blink as it nears detonation
+  tnts.forEach(t=>{
+    CTX.save();
+    CTX.fillStyle = '#1a1a1a';
+    CTX.beginPath(); CTX.arc(t.x, t.y, 16, 0, Math.PI*2); CTX.fill();
+    CTX.strokeStyle = '#ff5566'; CTX.lineWidth = 2; CTX.stroke();
+    const blinkRate = Math.max(4, Math.floor(t.fuse/6));
+    if(Math.floor(t.fuse/blinkRate)%2===0){
+      CTX.fillStyle = '#ffcf4f';
+      CTX.shadowColor = '#ffcf4f'; CTX.shadowBlur = 10;
+      CTX.beginPath(); CTX.arc(t.x, t.y-16, 4, 0, Math.PI*2); CTX.fill();
+    }
     CTX.restore();
   });
 
@@ -2193,6 +2969,183 @@ function render(){
     CTX.fillStyle = 'rgba(255,255,255,0.06)';
     CTX.fillRect(0,0,W,H);
   }
+}
+
+// Character-specific silhouette accents, drawn in the already-translated,
+// facing-relative coordinate space that drawPlayer uses (origin at the
+// character's feet). Keeps every roster member visually distinct beyond
+// just their palette and size.
+function drawCharacterDecoration(p){
+  const headY = -p.h-8, headR = p.w*0.34, bodyTop = -p.h, bodyBottom = -8;
+  CTX.save();
+  switch(p.type){
+    case 'golem': {
+      // jagged rock cracks across the torso, glowing seams at the shoulders
+      CTX.strokeStyle = 'rgba(255,255,255,0.55)'; CTX.lineWidth = 1.5;
+      CTX.beginPath();
+      CTX.moveTo(-p.w*0.2, bodyTop+p.h*0.25); CTX.lineTo(-p.w*0.04, bodyTop+p.h*0.42); CTX.lineTo(-p.w*0.16, bodyTop+p.h*0.6);
+      CTX.moveTo(p.w*0.18, bodyTop+p.h*0.3); CTX.lineTo(p.w*0.04, bodyTop+p.h*0.55);
+      CTX.stroke();
+      CTX.fillStyle = p.color;
+      CTX.beginPath(); CTX.arc(-p.w*0.42, bodyTop+p.h*0.15, 3, 0, Math.PI*2); CTX.fill();
+      CTX.beginPath(); CTX.arc(p.w*0.42, bodyTop+p.h*0.15, 3, 0, Math.PI*2); CTX.fill();
+      break;
+    }
+    case 'kitsune': {
+      // fox ears + a curved tail trailing behind
+      CTX.fillStyle = p.color; CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth = 1.5;
+      [-1,1].forEach(side=>{
+        CTX.beginPath();
+        CTX.moveTo(side*headR*0.6, headY-headR*0.5);
+        CTX.lineTo(side*headR*1.5, headY-headR*2.1);
+        CTX.lineTo(side*headR*0.15, headY-headR*0.9);
+        CTX.closePath(); CTX.fill(); CTX.stroke();
+      });
+      CTX.strokeStyle = p.color; CTX.lineWidth = 7; CTX.lineCap = 'round';
+      CTX.beginPath();
+      CTX.moveTo(-p.facing*p.w*0.35, bodyBottom-6);
+      CTX.quadraticCurveTo(-p.facing*p.w*1.2, bodyTop+p.h*0.55, -p.facing*p.w*0.85, bodyTop+p.h*0.15);
+      CTX.stroke();
+      break;
+    }
+    case 'lancer': {
+      // helm crest + shoulder pauldrons
+      CTX.fillStyle = p.color; CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth = 1.5;
+      CTX.beginPath();
+      CTX.moveTo(-headR*0.15, headY-headR*1.1); CTX.lineTo(headR*0.15, headY-headR*1.1); CTX.lineTo(0, headY-headR*2.2);
+      CTX.closePath(); CTX.fill(); CTX.stroke();
+      [-1,1].forEach(side=>{
+        CTX.beginPath();
+        roundRect(CTX, side*p.w*0.42-6, bodyTop+p.h*0.08, 12, 14, 3);
+        CTX.fill(); CTX.stroke();
+      });
+      break;
+    }
+    case 'sylph': {
+      // pair of translucent wing shapes on the back
+      CTX.fillStyle = 'rgba(255,255,255,0.35)'; CTX.strokeStyle = p.color; CTX.lineWidth = 1.5;
+      [-1,1].forEach(side=>{
+        CTX.beginPath();
+        CTX.moveTo(side*p.w*0.15, bodyTop+p.h*0.2);
+        CTX.quadraticCurveTo(side*p.w*1.3, bodyTop+p.h*0.05, side*p.w*0.9, bodyTop+p.h*0.65);
+        CTX.quadraticCurveTo(side*p.w*0.5, bodyTop+p.h*0.55, side*p.w*0.15, bodyTop+p.h*0.5);
+        CTX.closePath(); CTX.fill(); CTX.stroke();
+      });
+      break;
+    }
+    case 'volt': {
+      // angular lightning-bolt chest stripe
+      CTX.fillStyle = 'rgba(255,255,255,0.8)';
+      CTX.beginPath();
+      CTX.moveTo(p.w*0.08, bodyTop+p.h*0.15);
+      CTX.lineTo(-p.w*0.05, bodyTop+p.h*0.42);
+      CTX.lineTo(p.w*0.06, bodyTop+p.h*0.42);
+      CTX.lineTo(-p.w*0.1, bodyTop+p.h*0.75);
+      CTX.lineTo(p.w*0.1, bodyTop+p.h*0.5);
+      CTX.lineTo(0, bodyTop+p.h*0.5);
+      CTX.closePath(); CTX.fill();
+      break;
+    }
+    case 'shinobi': {
+      // trailing headband
+      CTX.fillStyle = p.color; CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth = 1.2;
+      CTX.beginPath();
+      roundRect(CTX, -headR*1.05, headY-headR*0.25, headR*2.1, headR*0.4, 2);
+      CTX.fill(); CTX.stroke();
+      CTX.beginPath();
+      CTX.moveTo(-p.facing*headR*1.0, headY-headR*0.05);
+      CTX.lineTo(-p.facing*headR*2.0, headY+headR*0.35);
+      CTX.lineTo(-p.facing*headR*1.5, headY+headR*0.1);
+      CTX.lineTo(-p.facing*headR*2.1, headY+headR*0.65);
+      CTX.closePath(); CTX.fill();
+      break;
+    }
+    case 'ronin': {
+      // topknot + headband
+      CTX.fillStyle = p.color; CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth = 1.2;
+      CTX.beginPath(); CTX.arc(0, headY-headR*1.3, headR*0.28, 0, Math.PI*2); CTX.fill(); CTX.stroke();
+      CTX.fillRect(-headR*1.05, headY-headR*0.15, headR*2.1, headR*0.32);
+      break;
+    }
+    case 'cobra': {
+      // diamond scale pattern down the torso + a small coiled tail hint
+      CTX.strokeStyle = 'rgba(255,255,255,0.45)'; CTX.lineWidth = 1.2;
+      for(let i=0;i<3;i++){
+        const yy = bodyTop + p.h*(0.2+i*0.2);
+        CTX.beginPath();
+        CTX.moveTo(0, yy-6); CTX.lineTo(p.w*0.16, yy); CTX.lineTo(0, yy+6); CTX.lineTo(-p.w*0.16, yy); CTX.closePath();
+        CTX.stroke();
+      }
+      break;
+    }
+    case 'forge': {
+      // blocky tool-belt + anvil-shaped chest mark
+      CTX.fillStyle = 'rgba(20,20,20,0.5)'; CTX.fillRect(-p.w*0.5, bodyBottom-10, p.w, 8);
+      CTX.fillStyle = 'rgba(255,255,255,0.7)';
+      CTX.beginPath();
+      roundRect(CTX, -p.w*0.16, bodyTop+p.h*0.2, p.w*0.32, p.h*0.1, 2);
+      CTX.fill();
+      CTX.fillRect(-p.w*0.06, bodyTop+p.h*0.3, p.w*0.12, p.h*0.12);
+      break;
+    }
+    case 'astra': {
+      // pointed hood + a small star mark on the chest
+      CTX.fillStyle = p.color; CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth = 1.5;
+      CTX.beginPath();
+      CTX.moveTo(-headR*1.1, headY-headR*0.3);
+      CTX.lineTo(0, headY-headR*2.3);
+      CTX.lineTo(headR*1.1, headY-headR*0.3);
+      CTX.lineTo(headR*0.6, headY+headR*0.1);
+      CTX.lineTo(-headR*0.6, headY+headR*0.1);
+      CTX.closePath(); CTX.fill(); CTX.stroke();
+      CTX.fillStyle = 'rgba(255,255,255,0.85)';
+      const cx=0, cy=bodyTop+p.h*0.35, r=5;
+      CTX.beginPath();
+      for(let i=0;i<5;i++){
+        const ang = -Math.PI/2 + i*(2*Math.PI/5);
+        const ang2 = ang + Math.PI/5;
+        CTX.lineTo(cx+Math.cos(ang)*r, cy+Math.sin(ang)*r);
+        CTX.lineTo(cx+Math.cos(ang2)*r*0.45, cy+Math.sin(ang2)*r*0.45);
+      }
+      CTX.closePath(); CTX.fill();
+      break;
+    }
+    case 'wrench': {
+      // rounded cap with a brim
+      CTX.fillStyle = p.color; CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth = 1.5;
+      CTX.beginPath();
+      CTX.arc(0, headY-headR*0.3, headR*1.05, Math.PI, 0);
+      CTX.fill(); CTX.stroke();
+      CTX.beginPath();
+      roundRect(CTX, -p.facing*2, headY-headR*0.35, p.facing*headR*1.3, headR*0.3, 3);
+      CTX.fill();
+      // overall straps
+      CTX.strokeStyle = 'rgba(20,20,20,0.4)'; CTX.lineWidth = 3;
+      CTX.beginPath();
+      CTX.moveTo(-p.w*0.18, bodyTop); CTX.lineTo(-p.w*0.1, bodyBottom);
+      CTX.moveTo(p.w*0.18, bodyTop); CTX.lineTo(p.w*0.1, bodyBottom);
+      CTX.stroke();
+      break;
+    }
+    case 'void': {
+      // dark hood/cloak with faint glowing fracture lines and drifting wisps
+      CTX.fillStyle = 'rgba(10,5,20,0.55)';
+      CTX.beginPath();
+      CTX.moveTo(-p.w*0.55, bodyTop+p.h*0.1);
+      CTX.quadraticCurveTo(0, bodyTop-p.h*0.15, p.w*0.55, bodyTop+p.h*0.1);
+      CTX.lineTo(p.w*0.4, bodyBottom);
+      CTX.lineTo(-p.w*0.4, bodyBottom);
+      CTX.closePath(); CTX.fill();
+      CTX.strokeStyle = p.color; CTX.lineWidth = 1;
+      CTX.beginPath();
+      CTX.moveTo(-p.w*0.15, bodyTop+p.h*0.3); CTX.lineTo(p.w*0.1, bodyTop+p.h*0.5);
+      CTX.moveTo(p.w*0.05, bodyTop+p.h*0.2); CTX.lineTo(-p.w*0.1, bodyTop+p.h*0.55);
+      CTX.stroke();
+      break;
+    }
+    default: break; // shinobi/other unlisted types just use the base silhouette
+  }
+  CTX.restore();
 }
 
 function drawPlayer(p){
@@ -2254,6 +3207,10 @@ function drawPlayer(p){
   CTX.arc(p.facing*p.w*0.16, -p.h-8, p.w*0.14, 0, Math.PI*2);
   CTX.fill();
 
+  // character-specific silhouette details — so each character reads
+  // distinctly at a glance instead of only differing by color/size
+  drawCharacterDecoration(p);
+
   // attack hitbox visual (reads live from the move's own data)
   if(p.attack){
     const a = p.attack, move = a.move;
@@ -2296,6 +3253,14 @@ function drawPlayer(p){
     CTX.font = '9px Space Mono';
     CTX.fillStyle = 'rgba(255,255,255,0.75)';
     CTX.fillText('T'+((p.tier||0)+1)+'/'+p.charData.tierMultipliers.length, p.x, p.y-p.h-38);
+    // equipment grade + durability, and banked material counts
+    if(p.materials){
+      const eqLabel = p.equipGrade>0 ? 'EQ'+p.equipGrade+' ('+p.equipDurability+')' : 'EQ0 (bare)';
+      CTX.fillText(eqLabel, p.x, p.y-p.h-50);
+      CTX.font = '8px Space Mono';
+      CTX.fillStyle = 'rgba(220,220,220,0.7)';
+      CTX.fillText('mats '+p.materials.join('/'), p.x, p.y-p.h-62);
+    }
   }
   CTX.restore();
 }
@@ -2368,6 +3333,7 @@ function buildSelectUI(){
 
 document.getElementById('cpuToggle').onclick = ()=>{ select.p2cpu=!select.p2cpu; buildSelectUI(); };
 document.getElementById('startMatchBtn').onclick = ()=>{
+  sfxUI();
   gameState='MATCH'; show(null); resetMatch();
 };
 document.getElementById('rematchBtn').onclick = ()=>{
