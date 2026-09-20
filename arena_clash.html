@@ -93,6 +93,10 @@
   .stat .pct{ font-size:26px; font-weight:900; }
   .stat.p1{ color:var(--cyan); text-align:left; }
   .stat.p2{ color:var(--magenta); text-align:right; }
+  .statRow{ display:flex; align-items:center; gap:8px; }
+  .stat.p2 .statRow{ flex-direction:row-reverse; }
+  .hudIcon{ width:44px; height:auto; flex-shrink:0; filter:drop-shadow(0 0 4px rgba(0,0,0,0.6)); }
+  .hudIcon svg{ display:block; width:100%; height:auto; }
   .stocks{ letter-spacing:3px; margin-top:2px; }
   #timer{ position:absolute; top:8px; left:50%; transform:translateX(-50%); font-family:'Orbitron',sans-serif; font-size:20px; z-index:4; }
   #resultText{ font-family:'Orbitron',sans-serif; font-size:34px; letter-spacing:3px; }
@@ -103,14 +107,24 @@
   <canvas id="c" width="960" height="540"></canvas>
   <div id="hud" class="hidden">
     <div class="stat p1">
-      <div>PLAYER 1</div>
-      <div class="pct" id="p1pct">0%</div>
-      <div class="stocks" id="p1stocks">●●●</div>
+      <div class="statRow">
+        <div class="hudIcon" id="p1hudIcon"></div>
+        <div>
+          <div>PLAYER 1</div>
+          <div class="pct" id="p1pct">0%</div>
+          <div class="stocks" id="p1stocks">●●●</div>
+        </div>
+      </div>
     </div>
     <div class="stat p2">
-      <div>PLAYER 2 <span id="p2cpuTag"></span></div>
-      <div class="pct" id="p2pct">0%</div>
-      <div class="stocks" id="p2stocks">●●●</div>
+      <div class="statRow">
+        <div>
+          <div>PLAYER 2 <span id="p2cpuTag"></span></div>
+          <div class="pct" id="p2pct">0%</div>
+          <div class="stocks" id="p2stocks">●●●</div>
+        </div>
+        <div class="hudIcon" id="p2hudIcon"></div>
+      </div>
     </div>
   </div>
   <div id="timer" class="hidden">2:00</div>
@@ -1545,6 +1559,9 @@ function resetMatch(){
   tnts = [];
   hitstop = 0; shake = 0;
   document.getElementById('p2cpuTag').textContent = select.p2cpu ? '[CPU Lv.'+select.p2level+']' : '';
+  // show each fighter's actual portrait icon in the match HUD, not just their name
+  document.getElementById('p1hudIcon').innerHTML = PORTRAITS[select.p1type] || '';
+  document.getElementById('p2hudIcon').innerHTML = PORTRAITS[select.p2type] || '';
 }
 
 // ---------- STATE MACHINE RULES ----------
